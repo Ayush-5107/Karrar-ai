@@ -12,6 +12,7 @@ import { useScrollProgress } from "../hooks/useScrollProgress";
 export function Landing({ onLogin }) {
     const [scrolled, setScrolled] = useState(false);
     const [activeNav, setActiveNav] = useState("Home");
+    const [mobileOpen, setMobileOpen] = useState(false);
     const dashRef = useRef(null);
     const dashProgress = useScrollProgress(dashRef);
     const [uploadState, setUploadState] = useState("idle");
@@ -197,30 +198,104 @@ export function Landing({ onLogin }) {
         }
 
         section { scroll-margin-top: 80px; }
+
+        /* ── RESPONSIVE GRID CLASSES ── */
+        .grid-steps    { display:grid; grid-template-columns:repeat(5,1fr); gap:20px; }
+        .grid-agents   { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; }
+        .grid-compare  { display:grid; grid-template-columns:1fr 1fr; gap:28px; }
+        .grid-pricing  { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; }
+        .grid-footer   { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:48px; margin-bottom:48px; }
+        .stats-row     { display:flex; gap:56px; justify-content:center; flex-wrap:wrap; padding:0 32px; }
+
+        /* ── DESKTOP NAV ── */
+        .nav-desktop   { flex:1; display:flex; justify-content:center; gap:36px; }
+        .nav-cta       { display:flex; gap:10px; }
+        .hamburger     { display:none; background:none; border:none; cursor:pointer; padding:4px; }
+        .mobile-drawer { display:none; }
+
+        /* ── MOBILE BREAKPOINT (768px) ── */
+        @media (max-width: 768px) {
+          .hamburger      { display:flex; align-items:center; justify-content:center; }
+          .nav-desktop    { display:none !important; }
+          .nav-cta        { display:none !important; }
+
+          .mobile-drawer {
+            display:flex; flex-direction:column;
+            position:fixed; top:60px; left:0; right:0; bottom:0;
+            background:rgba(0,0,0,0.95); backdrop-filter:blur(24px);
+            -webkit-backdrop-filter:blur(24px);
+            padding:32px 24px; gap:8px; z-index:199;
+            animation: fadeUp 0.25s ease;
+          }
+          .mobile-drawer .nav-link {
+            font-size:18px; padding:14px 0;
+            border-bottom:1px solid rgba(30,34,40,0.4);
+          }
+          .mobile-drawer .nav-link::after { display:none; }
+          .mobile-drawer .mobile-cta {
+            display:flex; flex-direction:column; gap:10px; margin-top:20px;
+          }
+
+          .grid-steps    { grid-template-columns:repeat(2,1fr); gap:14px; }
+          .grid-agents   { grid-template-columns:1fr; gap:16px; }
+          .grid-compare  { grid-template-columns:1fr; gap:20px; }
+          .grid-pricing  { grid-template-columns:1fr; gap:18px; }
+          .grid-footer   { grid-template-columns:1fr; gap:32px; }
+          .stats-row     { gap:24px; padding:0 16px; }
+
+          .section-pad   { padding-left:16px !important; padding-right:16px !important; }
+          .section-y     { padding-top:72px !important; padding-bottom:72px !important; }
+          .upload-zone   { padding:36px 20px; }
+        }
+
+        /* ── SMALL MOBILE (480px) ── */
+        @media (max-width: 480px) {
+          .grid-steps  { grid-template-columns:1fr; gap:12px; }
+          .stats-row   { gap:16px; flex-direction:column; align-items:center; }
+        }
       `}</style>
 
             {/* ── NAVBAR ─────────────────────────────────────────── */}
             <nav style={{
                 position: "fixed", top: 0, left: 0, right: 0, zIndex: 200,
-                background: scrolled ? "rgba(0,0,0,0.88)" : "transparent",
-                backdropFilter: scrolled ? "blur(24px)" : "none",
-                borderBottom: scrolled ? "1px solid #1E2228" : "none",
-                transition: "all 0.3s", padding: "0 40px",
+                background: scrolled ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.35)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+                borderBottom: scrolled ? "1px solid rgba(30,34,40,0.6)" : "1px solid rgba(30,34,40,0.15)",
+                transition: "all 0.3s", padding: "0 20px",
             }}>
-                <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", height: 68, gap: 32 }}>
+                <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", height: 60, gap: 32 }}>
                     <KarrarLogo size={32} />
-                    <div style={{ flex: 1, display: "flex", justifyContent: "center", gap: 36 }}>
+                    <div className="nav-desktop">
                         {NAV.map(n => <span key={n} className={`nav-link${activeNav === n ? " active" : ""}`} onClick={() => scrollToSection(n)}>{n}</span>)}
                     </div>
-                    <div style={{ display: "flex", gap: 10 }}>
+                    <div className="nav-cta">
                         <button className="btn-ghost" style={{ padding: "8px 20px", fontSize: 13 }} onClick={onLogin}>Login</button>
                         <button className="btn-gold" style={{ padding: "9px 22px", fontSize: 13 }} onClick={onLogin}>Try Free →</button>
                     </div>
+                    {/* Hamburger */}
+                    <button className="hamburger" onClick={() => setMobileOpen(!mobileOpen)} style={{ marginLeft: "auto" }}>
+                        {mobileOpen ? (
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C49E6C" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                        ) : (
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C49E6C" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+                        )}
+                    </button>
                 </div>
             </nav>
+            {/* ── MOBILE DRAWER ── */}
+            {mobileOpen && (
+                <div className="mobile-drawer">
+                    {NAV.map(n => <span key={n} className={`nav-link${activeNav === n ? " active" : ""}`} onClick={() => { scrollToSection(n); setMobileOpen(false); }}>{n}</span>)}
+                    <div className="mobile-cta">
+                        <button className="btn-ghost" style={{ padding: "12px 20px", fontSize: 15, width: "100%" }} onClick={() => { onLogin(); setMobileOpen(false); }}>Login</button>
+                        <button className="btn-gold" style={{ padding: "13px 22px", fontSize: 15, width: "100%" }} onClick={() => { onLogin(); setMobileOpen(false); }}>Try Free →</button>
+                    </div>
+                </div>
+            )}
 
             {/* ── HERO — Centered layout (like Image 1 but dark) ── */}
-            <section id="home" style={{ minHeight: "100vh", position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", paddingTop: 68, flexDirection: "column" }}>
+            <section id="home" style={{ minHeight: "100vh", position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", paddingTop: 60, flexDirection: "column" }}>
 
                 {/* Watermark icons */}
                 {LEGAL_ICONS.map((ic, i) => (
@@ -390,7 +465,7 @@ export function Landing({ onLogin }) {
 
             {/* ── STATS BAR ─────────────────────────────────────── */}
             <div style={{ background: "#050505", padding: "28px 0", borderTop: "1px solid #1E2228", borderBottom: "1px solid #1E2228" }}>
-                <StaggerContainer stagger={0.15} delay={0.1} style={{ display: "flex", gap: 56, justifyContent: "center", flexWrap: "wrap", padding: "0 32px" }}>
+                <StaggerContainer stagger={0.15} delay={0.1} className="stats-row">
                     {[
                         { label: "Contracts Analyzed", value: 12400, suffix: "+" },
                         { label: "Risk Clauses Flagged", value: 84000, suffix: "+" },
@@ -410,7 +485,7 @@ export function Landing({ onLogin }) {
             </div>
 
             {/* ── HOW IT WORKS ──────────────────────────────────── */}
-            <section id="how-it-works" style={{ padding: "120px 32px", background: "#000000" }}>
+            <section id="how-it-works" className="section-pad section-y" style={{ padding: "120px 32px", background: "#000000" }}>
                 <div style={{ maxWidth: 1100, margin: "0 auto" }}>
                     <FadeUp style={{ textAlign: "center", marginBottom: 64 }}>
                         <span style={{ fontSize: 11, color: "#C49E6C", fontFamily: "IBM Plex Mono, monospace", letterSpacing: "0.12em" }}>THE PROCESS</span>
@@ -419,7 +494,7 @@ export function Landing({ onLogin }) {
                     </FadeUp>
                     <div style={{ position: "relative" }}>
                         <div style={{ position: "absolute", top: 36, left: "8%", right: "8%", height: 1, background: "linear-gradient(90deg,transparent,rgba(196,158,108,0.4),transparent)" }} />
-                        <StaggerContainer stagger={0.1} delay={0.1} style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 20 }}>
+                        <StaggerContainer stagger={0.1} delay={0.1} className="grid-steps">
                             {[
                                 { num: "01", title: "Upload", desc: "Drag & drop your PDF contract. No account needed." },
                                 { num: "02", title: "Parallel Analysis", desc: "6 agents analyze simultaneously in under 90 seconds." },
@@ -444,7 +519,7 @@ export function Landing({ onLogin }) {
             </section>
 
             {/* ── AGENTS ────────────────────────────────────────── */}
-            <section id="agents" style={{ padding: "120px 32px", background: "#030303", position: "relative", overflow: "hidden" }}>
+            <section id="agents" className="section-pad section-y" style={{ padding: "120px 32px", background: "#030303", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(196,158,108,0.06) 1px, transparent 1px)", backgroundSize: "28px 28px", pointerEvents: "none" }} />
                 <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative" }}>
                     <FadeUp style={{ textAlign: "center", marginBottom: 64 }}>
@@ -452,7 +527,7 @@ export function Landing({ onLogin }) {
                         <h2 style={{ fontFamily: "Playfair Display, serif", fontSize: "clamp(36px,5vw,56px)", fontWeight: 900, color: "#FFFFFF", marginTop: 10 }}>Meet Your Legal Team</h2>
                         <p style={{ color: "#666", fontSize: 16, marginTop: 12 }}>6 specialized AI agents working in parallel on every upload</p>
                     </FadeUp>
-                    <StaggerContainer stagger={0.12} delay={0.1} style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 24 }}>
+                    <StaggerContainer stagger={0.12} delay={0.1} className="grid-agents">
                         {[
                             { name: "Completeness Agent", role: "Finds missing annexures & schedules", color: "#3b82f6", num: "01", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10" cy="10" r="6" /><line x1="14.5" y1="14.5" x2="20" y2="20" /><polyline points="8,10 10,12 13,8" /></svg> },
                             { name: "Risk & Red Flag Agent", role: "Scores every clause 0–100", color: "#ef4444", num: "02", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6L12 2z" /><line x1="12" y1="8" x2="12" y2="13" /><circle cx="12" cy="16" r="0.8" fill="currentColor" /></svg> },
@@ -480,13 +555,13 @@ export function Landing({ onLogin }) {
             </section>
 
             {/* ── BEFORE / AFTER ────────────────────────────────── */}
-            <section id="features" style={{ padding: "120px 32px", background: "#000000" }}>
+            <section id="features" className="section-pad section-y" style={{ padding: "120px 32px", background: "#000000" }}>
                 <div style={{ maxWidth: 960, margin: "0 auto" }}>
                     <FadeUp style={{ textAlign: "center", marginBottom: 56 }}>
                         <span style={{ fontSize: 11, color: "#C49E6C", fontFamily: "IBM Plex Mono, monospace", letterSpacing: "0.12em" }}>REAL IMPACT</span>
                         <h2 style={{ fontFamily: "Playfair Display, serif", fontSize: "clamp(36px,5vw,56px)", fontWeight: 900, color: "#FFFFFF", marginTop: 10 }}>Before vs. After Karrar.ai</h2>
                     </FadeUp>
-                    <StaggerContainer stagger={0.2} delay={0.1} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
+                    <StaggerContainer stagger={0.2} delay={0.1} className="grid-compare">
                         <StaggerChild><MotionCard color="#ef4444" style={{ background: "#0A0B0E", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 20, padding: 32 }}>
                             <div style={{ fontSize: 11, color: "#ef4444", fontFamily: "IBM Plex Mono, monospace", marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}>
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
@@ -523,7 +598,7 @@ export function Landing({ onLogin }) {
             </section>
 
             {/* ── UPLOAD DEMO ───────────────────────────────────── */}
-            <section style={{ padding: "120px 32px", background: "#030303" }}>
+            <section className="section-pad section-y" style={{ padding: "120px 32px", background: "#030303" }}>
                 <div style={{ maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
                     <FadeUp>
                         <span style={{ fontSize: 11, color: "#C49E6C", fontFamily: "IBM Plex Mono, monospace", letterSpacing: "0.12em" }}>TRY IT NOW</span>
@@ -579,14 +654,14 @@ export function Landing({ onLogin }) {
             </section>
 
             {/* ── PRICING ───────────────────────────────────────── */}
-            <section id="pricing" style={{ padding: "120px 32px", background: "#000000" }}>
+            <section id="pricing" className="section-pad section-y" style={{ padding: "120px 32px", background: "#000000" }}>
                 <div style={{ maxWidth: 980, margin: "0 auto" }}>
                     <FadeUp style={{ textAlign: "center", marginBottom: 64 }}>
                         <span style={{ fontSize: 11, color: "#C49E6C", fontFamily: "IBM Plex Mono, monospace", letterSpacing: "0.12em" }}>PRICING</span>
                         <h2 style={{ fontFamily: "Playfair Display, serif", fontSize: "clamp(36px,5vw,56px)", fontWeight: 900, color: "#FFFFFF", marginTop: 10 }}>Simple, Transparent Pricing</h2>
                         <p style={{ color: "#555", fontSize: 16, marginTop: 12 }}>Start free. Pay only when you need more.</p>
                     </FadeUp>
-                    <StaggerContainer stagger={0.15} delay={0.15} style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 24 }}>
+                    <StaggerContainer stagger={0.15} delay={0.15} className="grid-pricing">
                         {[
                             { name: "Free", price: "₹0", period: "forever", features: ["3 contracts/month", "Basic risk scoring", "Plain language summary", "Email support"], cta: "Get Started Free", featured: false },
                             { name: "Pro", price: "₹999", period: "/month", features: ["Unlimited contracts", "All 6 AI agents", "Counter-term generation", "Contract history", "Priority support", "Indian law database"], cta: "Start Pro", featured: true },
@@ -620,7 +695,7 @@ export function Landing({ onLogin }) {
             </section>
 
             {/* ── CTA ──────────────────────────────────────────────*/}
-            <section id="about" style={{ padding: "120px 32px", background: "#030303", textAlign: "center", position: "relative", overflow: "hidden" }}>
+            <section id="about" className="section-pad section-y" style={{ padding: "120px 32px", background: "#030303", textAlign: "center", position: "relative", overflow: "hidden" }}>
                 <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(196,158,108,0.07) 1px, transparent 1px)", backgroundSize: "28px 28px", pointerEvents: "none" }} />
                 <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 55% 45% at 50% 50%, rgba(196,158,108,0.07) 0%, transparent 70%)", pointerEvents: "none" }} />
                 <div style={{ position: "relative" }}>
@@ -640,9 +715,9 @@ export function Landing({ onLogin }) {
             </section>
 
             {/* ── FOOTER ────────────────────────────────────────── */}
-            <footer style={{ background: "#050505", padding: "72px 32px 36px", borderTop: "1px solid #1E2228" }}>
+            <footer className="section-pad" style={{ background: "#050505", padding: "72px 32px 36px", borderTop: "1px solid #1E2228" }}>
                 <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 48, marginBottom: 48 }}>
+                    <div className="grid-footer">
                         <div>
                             <KarrarLogo size={30} />
                             <p style={{ fontSize: 13, lineHeight: 1.75, color: "#444", maxWidth: 270, marginTop: 14 }}>India's first multi-agent legal AI for contracts. Built for freelancers, founders, and SMEs.</p>

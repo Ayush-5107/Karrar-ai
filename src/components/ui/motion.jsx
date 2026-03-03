@@ -35,7 +35,7 @@ export const ScaleIn = ({ children, delay = 0, style = {} }) => {
     );
 };
 
-export const StaggerContainer = ({ children, stagger = 0.1, delay = 0, style = {} }) => {
+export const StaggerContainer = ({ children, stagger = 0.1, delay = 0, style = {}, className }) => {
     const ref = useRef(null);
     const inView = useInView(ref, { once: true, margin: "-60px" });
     return (
@@ -45,6 +45,7 @@ export const StaggerContainer = ({ children, stagger = 0.1, delay = 0, style = {
             animate={inView ? "visible" : "hidden"}
             variants={{ visible: { transition: { staggerChildren: stagger, delayChildren: delay } } }}
             style={style}
+            className={className}
         >
             {children}
         </motion.div>
