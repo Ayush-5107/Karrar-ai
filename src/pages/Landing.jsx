@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 import { useState, useEffect, useRef } from "react";
-import { motion, useMotionValue, useSpring } from "framer-motion";
+import { motion, useMotionValue, useSpring, AnimatePresence } from "framer-motion";
 import { KarrarLogo } from "../components/ui/logo";
 import { LEGAL_ICONS, WmScales, WmSeal, WmQuill, WmPillar } from "../components/ui/icons";
 import { AnimatedHeadline, FadeUp, StaggerContainer, StaggerChild, MotionCard } from "../components/ui/motion";
@@ -9,6 +9,15 @@ import { RiskBadge } from "../components/ui/risk-badge";
 import { DashboardPreview } from "../components/sections/DashboardPreview";
 import { useScrollProgress } from "../hooks/useScrollProgress";
 
+const LANDING_AGENTS = [
+    { name: "Completeness Agent", role: "Finds missing annexures & schedules", color: "#3b82f6", num: "01", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10" cy="10" r="6" /><line x1="14.5" y1="14.5" x2="20" y2="20" /><polyline points="8,10 10,12 13,8" /></svg>, detail: "Scans your entire contract to identify missing schedules, annexures, appendices, and referenced documents. If a clause mentions 'Schedule A' or 'Annexure 3' but it's not attached, this agent flags it — ensuring you never sign an incomplete agreement." },
+    { name: "Risk & Red Flag Agent", role: "Scores every clause 0–100", color: "#ef4444", num: "02", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6L12 2z" /><line x1="12" y1="8" x2="12" y2="13" /><circle cx="12" cy="16" r="0.8" fill="currentColor" /></svg>, detail: "Analyzes every clause for potential risks — one-sided termination, unlimited liability, broad indemnity, non-compete overreach, and more. Each clause gets a risk score from 0 (safe) to 100 (dangerous), with financial exposure estimates in ₹ where applicable." },
+    { name: "Negotiation Agent", role: "Generates copy-paste counter-terms", color: "#C49E6C", num: "03", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M7 16H3v-4" /><path d="M3 12c0-4.4 3.6-8 8-8s8 3.6 8 8" /><path d="M17 8h4v4" /><path d="M21 12c0 4.4-3.6 8-8 8s-8-3.6-8-8" /></svg>, detail: "For every high-risk clause identified, this agent generates a professional, legally-sound counter-term you can copy-paste directly into your response email. It balances protecting your interests while maintaining a fair negotiation tone." },
+    { name: "Draft Consistency Agent", role: "Catches internal contradictions", color: "#8b5cf6", num: "04", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="5" width="11" height="14" rx="1.5" /><rect x="10" y="3" width="11" height="14" rx="1.5" fill="#030303" /><line x1="13" y1="8" x2="18" y2="8" /><line x1="13" y1="11" x2="17" y2="11" /></svg>, detail: "Cross-references all clauses against each other to catch contradictions — like one clause saying '30-day notice' while another says 'immediate termination.' These drafting errors are common and can void entire agreements under Indian law." },
+    { name: "Regulatory Agent", role: "Cross-checks Indian Contract Act", color: "#22c55e", num: "05", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><line x1="3" y1="12" x2="21" y2="12" /><path d="M12 3a14 14 0 0 1 3 9 14 14 0 0 1-3 9 14 14 0 0 1-3-9 14 14 0 0 1 3-9z" /></svg>, detail: "Validates every clause against Indian Contract Act 1872, IT Act 2000, DPDP Act 2023, and other applicable regulations. Flags clauses that may be void, voidable, or unenforceable under Indian jurisdiction, citing the specific section of law." },
+    { name: "Explanation Agent", role: "Translates legalese to plain English", color: "#f59e0b", num: "06", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><line x1="8" y1="10" x2="10" y2="10" /><line x1="13" y1="10" x2="16" y2="10" /><line x1="9" y1="13" x2="15" y2="13" /></svg>, detail: "Translates dense legal jargon into simple, plain English (and Hindi) that anyone can understand. No law degree needed — this agent tells you exactly what each clause means for you in everyday language, with a readability score." },
+];
+
 export function Landing({ onLogin }) {
     const [scrolled, setScrolled] = useState(false);
     const [activeNav, setActiveNav] = useState("Home");
@@ -16,6 +25,7 @@ export function Landing({ onLogin }) {
     const dashRef = useRef(null);
     const dashProgress = useScrollProgress(dashRef);
     const [uploadState, setUploadState] = useState("idle");
+    const [expandedAgent, setExpandedAgent] = useState(null);
     const [progress, setProgress] = useState(0);
     const [progressLabel, setProgressLabel] = useState("");
     const mouseX = useMotionValue(-999);
@@ -333,7 +343,7 @@ export function Landing({ onLogin }) {
                             transition={{ duration: 2, repeat: Infinity }}
                             style={{ width: 7, height: 7, borderRadius: "50%", background: "linear-gradient(90deg,#C49E6C,#F5D08A)", display: "inline-block" }}
                         />
-                        <span style={{ fontSize: 13, color: "#C49E6C", fontFamily: "IBM Plex Mono, monospace", letterSpacing: "0.07em" }}>India's First Multi-Agent Legal AI — Now Live</span>
+                        <span style={{ fontSize: 13, color: "#C49E6C", fontFamily: "IBM Plex Mono, monospace", letterSpacing: "0.07em" }}>India's Own Multi-Agent Legal AI — Now Live</span>
                     </motion.div>
 
                     {/* Logo lockup */}
@@ -360,7 +370,7 @@ export function Landing({ onLogin }) {
                         transition={{ duration: 0.7, delay: 0.7, ease: "easeOut" }}
                         style={{ fontSize: "clamp(18px, 2.2vw, 22px)", color: "#888", lineHeight: 1.75, marginBottom: 9 }}
                     >
-                        <strong style={{ color: "#FFFFFF" }}>India's First Multi-Agent Legal AI.</strong>
+                        <strong style={{ color: "#FFFFFF" }}>India's Own Multi-Agent Legal AI.</strong>
                     </motion.p>
                     <motion.p
                         initial={{ opacity: 0, y: 22 }}
@@ -494,8 +504,8 @@ export function Landing({ onLogin }) {
                         <p style={{ color: "#666", fontSize: 16, marginTop: 12 }}>in under 90 seconds</p>
                     </FadeUp>
                     <div style={{ position: "relative" }}>
-                        <div style={{ position: "absolute", top: 36, left: "8%", right: "8%", height: 1, background: "linear-gradient(90deg,transparent,rgba(196,158,108,0.4),transparent)" }} />
-                        <StaggerContainer stagger={0.1} delay={0.1} className="grid-steps">
+                        <div style={{ position: "absolute", top: 55, left: "8%", right: "8%", height: 1, background: "linear-gradient(90deg,transparent,rgba(196,158,108,0.4),transparent)", zIndex: 0 }} />
+                        <StaggerContainer stagger={0.1} delay={0.1} className="grid-steps" style={{ position: "relative", zIndex: 1 }}>
                             {[
                                 { num: "01", title: "Upload", desc: "Drag & drop your PDF contract. No account needed." },
                                 { num: "02", title: "Parallel Analysis", desc: "6 agents analyze simultaneously in under 90 seconds." },
@@ -504,7 +514,7 @@ export function Landing({ onLogin }) {
                                 { num: "05", title: "Act", desc: "Sign with clarity, negotiate, or consult a lawyer." },
                             ].map((s, i) => (
                                 <StaggerChild key={i}>
-                                    <MotionCard color="#C49E6C" style={{ background: "#0A0B0E", border: "1px solid #1E2228", borderRadius: 16, padding: "28px 18px", textAlign: "center", height: "100%" }}>
+                                    <MotionCard color="#C49E6C" style={{ background: "#0A0B0E", border: "1px solid #1E2228", borderRadius: 16, padding: "28px 18px", textAlign: "center", height: "100%", position: "relative", zIndex: 2 }}>
                                         <div style={{ width: 52, height: 52, background: "rgba(196,158,108,0.06)", border: "1px solid rgba(196,158,108,0.12)", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                                             <span style={{ fontFamily: "Playfair Display, serif", fontSize: 22, fontWeight: 900, background: "linear-gradient(135deg,#C49E6C,#F5D08A)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{i + 1}</span>
                                         </div>
@@ -529,28 +539,27 @@ export function Landing({ onLogin }) {
                         <p style={{ color: "#666", fontSize: 16, marginTop: 12 }}>6 specialized AI agents working in parallel on every upload</p>
                     </FadeUp>
                     <StaggerContainer stagger={0.12} delay={0.1} className="grid-agents">
-                        {[
-                            { name: "Completeness Agent", role: "Finds missing annexures & schedules", color: "#3b82f6", num: "01", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10" cy="10" r="6" /><line x1="14.5" y1="14.5" x2="20" y2="20" /><polyline points="8,10 10,12 13,8" /></svg> },
-                            { name: "Risk & Red Flag Agent", role: "Scores every clause 0–100", color: "#ef4444", num: "02", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6L12 2z" /><line x1="12" y1="8" x2="12" y2="13" /><circle cx="12" cy="16" r="0.8" fill="currentColor" /></svg> },
-                            { name: "Negotiation Agent", role: "Generates copy-paste counter-terms", color: "#C49E6C", num: "03", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M7 16H3v-4" /><path d="M3 12c0-4.4 3.6-8 8-8s8 3.6 8 8" /><path d="M17 8h4v4" /><path d="M21 12c0 4.4-3.6 8-8 8s-8-3.6-8-8" /></svg> },
-                            { name: "Draft Consistency Agent", role: "Catches internal contradictions", color: "#8b5cf6", num: "04", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="5" width="11" height="14" rx="1.5" /><rect x="10" y="3" width="11" height="14" rx="1.5" fill="#030303" /><line x1="13" y1="8" x2="18" y2="8" /><line x1="13" y1="11" x2="17" y2="11" /></svg> },
-                            { name: "Regulatory Agent", role: "Cross-checks Indian Contract Act", color: "#22c55e", num: "05", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><line x1="3" y1="12" x2="21" y2="12" /><path d="M12 3a14 14 0 0 1 3 9 14 14 0 0 1-3 9 14 14 0 0 1-3-9 14 14 0 0 1 3-9z" /></svg> },
-                            { name: "Explanation Agent", role: "Translates legalese to plain English", color: "#f59e0b", num: "06", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><line x1="8" y1="10" x2="10" y2="10" /><line x1="13" y1="10" x2="16" y2="10" /><line x1="9" y1="13" x2="15" y2="13" /></svg> },
-                        ].map((a, i) => (
+                        {LANDING_AGENTS.map((a, i) => {
+                            const isOpen = expandedAgent === i;
+                            return (
                             <StaggerChild key={i}>
-                                <MotionCard color={a.color} style={{ background: "#0A0B0E", border: "1px solid #1E2228", borderRadius: 20, padding: "28px" }}>
+                                <MotionCard color={a.color} style={{ background: "#0A0B0E", border: "1px solid #1E2228", borderRadius: 20, padding: "28px", cursor: "pointer", transition: "border-color 0.3s" }} onClick={() => setExpandedAgent(i)}>
                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                                         <div style={{ width: 46, height: 46, background: a.color + "18", border: `1px solid ${a.color}30`, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", color: a.color }}>
                                             {a.icon}
                                         </div>
-                                        <span style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 22, fontWeight: 700, color: "#1A1A1A", transition: "color 0.2s" }}>{a.num}</span>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                            <span style={{ fontSize: 10, color: a.color, fontFamily: "IBM Plex Mono, monospace", opacity: 0.7 }}>+</span>
+                                            <span style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 22, fontWeight: 700, color: "#1A1A1A", transition: "color 0.2s" }}>{a.num}</span>
+                                        </div>
                                     </div>
                                     <div style={{ fontFamily: "Playfair Display, serif", fontSize: 17, fontWeight: 700, color: "#FFFFFF", marginBottom: 8 }}>{a.name}</div>
                                     <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>{a.role}</div>
                                     <div style={{ marginTop: 16, height: 2, background: `linear-gradient(90deg,${a.color},transparent)`, borderRadius: 2 }} />
                                 </MotionCard>
                             </StaggerChild>
-                        ))}
+                            );
+                        })}
                     </StaggerContainer>
                 </div>
             </section>
@@ -745,6 +754,44 @@ export function Landing({ onLogin }) {
                     </div>
                 </div>
             </footer>
+
+            {/* ── AGENT MODAL OVERLAY ──────────────────────────── */}
+            <AnimatePresence>
+                {expandedAgent !== null && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setExpandedAgent(null)}
+                        style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                            onClick={e => e.stopPropagation()}
+                            style={{ background: "#0A0B0E", border: `1px solid ${LANDING_AGENTS[expandedAgent].color}55`, borderRadius: 24, padding: 36, maxWidth: 540, width: "100%", position: "relative", boxShadow: `0 24px 48px -12px ${LANDING_AGENTS[expandedAgent].color}33` }}
+                        >
+                            <button onClick={() => setExpandedAgent(null)} style={{ position: "absolute", top: 20, right: 20, background: "transparent", border: "none", color: "#666", cursor: "pointer", fontSize: 24, padding: 4, display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: "50%", transition: "background 0.2s" }} onMouseEnter={e => e.currentTarget.style.background = "#1A1B1E"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                                &times;
+                            </button>
+                            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+                                <div style={{ width: 56, height: 56, background: LANDING_AGENTS[expandedAgent].color + "18", border: `1px solid ${LANDING_AGENTS[expandedAgent].color}40`, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", color: LANDING_AGENTS[expandedAgent].color, transform: "scale(1.2)" }}>
+                                    {LANDING_AGENTS[expandedAgent].icon}
+                                </div>
+                                <div>
+                                    <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 12, color: LANDING_AGENTS[expandedAgent].color, letterSpacing: "0.1em", marginBottom: 4 }}>AGENT {LANDING_AGENTS[expandedAgent].num}</div>
+                                    <div style={{ fontFamily: "Playfair Display, serif", fontSize: 24, fontWeight: 700, color: "#FFFFFF" }}>{LANDING_AGENTS[expandedAgent].name}</div>
+                                </div>
+                            </div>
+                            <div style={{ fontSize: 15, color: "#AAA", lineHeight: 1.8 }}>
+                                {LANDING_AGENTS[expandedAgent].detail}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

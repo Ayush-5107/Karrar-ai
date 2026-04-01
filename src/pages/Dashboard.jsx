@@ -3,8 +3,8 @@ import { useState, useEffect, useRef, Fragment } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Store } from "../lib/store";
 import { MOCK_ANALYSIS } from "../lib/mockData";
+import { analyzeContract } from "../lib/api";
 import { KarrarLogo } from "../components/ui/logo";
-import { UpgradeModal } from "../components/modals/UpgradeModal";
 import { DisclaimerModal } from "../components/modals/DisclaimerModal";
 import { LawyerWarningModal } from "../components/modals/LawyerWarningModal";
 
@@ -104,9 +104,9 @@ export function Dashboard({ user, onLogout }) {
     const [planDropdownOpen, setPlanDropdownOpen] = useState(false);
 
     // ── New feature state
+    const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
     const [showDisclaimer, setShowDisclaimer] = useState(false);
     const [showLawyerWarn, setShowLawyerWarn] = useState(false);
-    const [showUpgrade, setShowUpgrade] = useState(false);
     const [contractHistory, setContractHistory] = useState([]);
     const [analysesUsed, setAnalysesUsed] = useState(0);
     const [aiLoading, setAiLoading] = useState(false);
@@ -115,7 +115,7 @@ export function Dashboard({ user, onLogout }) {
     const [revisedAnalysis, setRevisedAnalysis] = useState(null);
     const [diffView, setDiffView] = useState(false);
     const [viewingContract, setViewingContract] = useState(null);
-    const [hoveredAgent, setHoveredAgent] = useState(null);
+    const [expandedAgent, setExpandedAgent] = useState(null);
 
     const fileRef = useRef(null);
     const relatedRef = useRef(null);
@@ -160,24 +160,8 @@ export function Dashboard({ user, onLogout }) {
         document.body.style.cursor = "col-resize";
     };
 
-    // User role: demo@karrar.ai = Pro (unlimited), others = Free (3/month)
-    const isPro = user.email === "demo@karrar.ai";
-    const analysesLimit = isPro ? Infinity : 3;
-    const analysesLeft = Math.max(0, analysesLimit - analysesUsed);
-
-    // ── Load persistent data on mount
-    useEffect(() => {
-        const load = async () => {
-            const history = await Store.get("contracts-history");
-            if (history) setContractHistory(history);
-            const month = new Date().toISOString().slice(0, 7);
-            const used = await Store.get(`analyses-used-${month}`);
-            if (used) setAnalysesUsed(used);
-            const disclaimerDone = await Store.get("disclaimer-accepted");
-            // will show on first report view
-        };
-        load();
-    }, []);
+    // ── No persistent data — everything resets on page refresh
+    useEffect(() => {}, []);
 
     const AGENTS = [
         { id: "completeness", name: "Completeness Agent", color: "#3b82f6", icon: <svg width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>, desc: "Checks for missing schedules, annexures & referenced docs" },
@@ -202,51 +186,13 @@ export function Dashboard({ user, onLogout }) {
     const rc = (r) => r === "Critical" || r === "High" ? "#ef4444" : r === "Medium" || r === "Med" ? "#f59e0b" : "#22c55e";
     const rb = (r) => r === "Critical" || r === "High" ? "rgba(239,68,68,0.09)" : r === "Medium" || r === "Med" ? "rgba(245,158,11,0.09)" : "rgba(34,197,94,0.09)";
 
-    // ── Real AI Analysis via Anthropic API
+    // ── AI Analysis via FastAPI backend (falls back to mock)
     const runAIAnalysis = async (file) => {
         setAiLoading(true);
         try {
-            // Convert file to base64
-            const base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result.split(",")[1]);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-
-            const isPDF = file.name.toLowerCase().endsWith(".pdf");
-            const messages = isPDF ? [
-                {
-                    role: "user", content: [
-                        { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
-                        {
-                            type: "text", text: `Analyze this contract and return ONLY valid JSON (no markdown, no preamble) with this exact structure:
-{"overallScore":number,"riskLevel":"Low|Medium|High|Critical","completenessScore":number,"clauses":[{"id":number,"title":string,"type":string,"riskScore":number,"riskLevel":"Low|Medium|High|Critical","agent":string,"negotiable":boolean,"confidence":number,"original":string,"plain":string,"counter":string,"financialExposure":string,"regulatoryNote":string}],"agentOutputs":{"completeness":{"score":number,"status":string,"missing":[],"present":[]},"risk":{"score":number,"critical":number,"high":number,"medium":number,"low":number,"topRisk":string},"negotiation":{"counterTermsGenerated":number,"strategy":string,"mostLeverageClause":string},"consistency":{"contradictions":number,"issues":[]},"regulatory":{"complianceScore":number,"violations":[],"jurisdiction":string},"explanation":{"readabilityScore":number,"grade":string,"summary":string}}}
-Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statutes. Assign risk scores 0-100. Flag clauses with riskScore>70 as High/Critical.` }
-                    ]
-                }
-            ] : [
-                { role: "user", content: `Analyze this contract file named "${file.name}" and return ONLY valid JSON with risk analysis grounded in Indian law. Use the structure: {"overallScore":number,"riskLevel":"High","completenessScore":number,"clauses":[...],"agentOutputs":{...}}` }
-            ];
-
-            const response = await fetch("https://api.anthropic.com/v1/messages", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    model: "claude-sonnet-4-20250514",
-                    max_tokens: 4000,
-                    system: "You are a multi-agent legal contract analysis system for Indian law. You analyze contracts and return structured JSON. Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and relevant Indian statutes. Return ONLY valid JSON, no markdown fences.",
-                    messages,
-                })
-            });
-
-            const data = await response.json();
-            const text = data.content?.map(b => b.text || "").join("") || "";
-            const clean = text.replace(/```json|```/g, "").trim();
-            const parsed = JSON.parse(clean);
-            return { ...parsed, fileName: file.name };
+            return await analyzeContract(file);
         } catch (err) {
-            console.error("AI analysis failed, using mock:", err);
+            console.error("Analysis failed, using mock:", err);
             return { ...MOCK_ANALYSIS, fileName: file.name };
         } finally {
             setAiLoading(false);
@@ -265,17 +211,16 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
         };
         const newHistory = [entry, ...contractHistory];
         setContractHistory(newHistory);
-        await Store.set("contracts-history", newHistory);
+        // No persistence — data resets on refresh
 
         // Increment usage counter
         const month = new Date().toISOString().slice(0, 7);
         const newUsed = analysesUsed + 1;
         setAnalysesUsed(newUsed);
-        await Store.set(`analyses-used-${month}`, newUsed);
+        // No persistence — usage resets on refresh
     };
 
     const startAnalysis = async (file) => {
-        if (!isPro && analysesUsed >= analysesLimit) { setShowUpgrade(true); return; }
         setUploadedFile(file);
         setUploadPhase("analyzing");
         setAnalysisStep(0); setAnalysisPct(0);
@@ -313,15 +258,14 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
 
     const openReport = async () => {
         const month = new Date().toISOString().slice(0, 7);
-        const accepted = await Store.get("disclaimer-accepted");
-        if (!accepted) { setShowDisclaimer(true); return; }
+        if (!disclaimerAccepted) { setShowDisclaimer(true); return; }
         // Show lawyer warning if high risk
         if (analysis && analysis.overallScore >= 7.5) { setShowLawyerWarn(true); return; }
         setActiveNav("Reports");
     };
 
     const handleDisclaimerAccept = async (dontShow) => {
-        if (dontShow) await Store.set("disclaimer-accepted", true);
+        setDisclaimerAccepted(true);
         setShowDisclaimer(false);
         if (analysis && analysis.overallScore >= 7.5) { setShowLawyerWarn(true); return; }
         setActiveNav("Reports");
@@ -334,27 +278,27 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
         lines.push(`Generated: ${new Date().toLocaleDateString("en-IN")}`);
         lines.push(`Contract: ${analysis.fileName}`);
         lines.push(`Overall Risk Score: ${analysis.overallScore}/10 — ${analysis.riskLevel}`);
-        lines.push(`Compliance Score: ${analysis.agentOutputs.regulatory.complianceScore}%`);
+        lines.push(`Compliance Score: ${analysis.agentOutputs?.regulatory?.complianceScore || 0}%`);
         lines.push("");
         lines.push("AI SUMMARY");
-        lines.push(analysis.agentOutputs.explanation.summary);
+        lines.push(analysis.agentOutputs?.explanation?.summary || "Summary not available.");
         lines.push("");
         lines.push("CLAUSE ANALYSIS");
-        analysis.clauses.forEach((c, i) => {
-            lines.push(`${i + 1}. ${c.title}`);
-            lines.push(`   Risk: ${c.riskScore}/100 (${c.riskLevel}) | Agent: ${c.agent} | Confidence: ${c.confidence}%`);
-            lines.push(`   Original: ${c.original}`);
-            lines.push(`   Plain English: ${c.plain}`);
+        (analysis.clauses || []).forEach((c, i) => {
+            lines.push(`${i + 1}. ${c.title || c.original_text || 'Clause ' + (i + 1)}`);
+            lines.push(`   Risk: ${c.riskScore || 0}/100 (${c.riskLevel || 'Unknown'}) | Negotiable: ${c.negotiable ? 'Yes' : 'No'}`);
+            lines.push(`   Original: ${c.original || c.original_text || 'N/A'}`);
+            if (c.plain || c.explanation) lines.push(`   Plain English: ${c.plain || c.explanation}`);
             if (c.counter) lines.push(`   Counter-Term: ${c.counter}`);
             if (c.financialExposure) lines.push(`   Financial Exposure: ${c.financialExposure}`);
             if (c.regulatoryNote) lines.push(`   Regulatory: ${c.regulatoryNote}`);
             lines.push("");
         });
         lines.push("REGULATORY VIOLATIONS");
-        analysis.agentOutputs.regulatory.violations.forEach(v => lines.push(`• ${v}`));
+        (analysis.agentOutputs?.regulatory?.violations || []).forEach(v => lines.push(`• ${v}`));
         lines.push("");
         lines.push("CONSISTENCY ISSUES");
-        analysis.agentOutputs.consistency.issues.forEach(i => lines.push(`• ${i}`));
+        (analysis.agentOutputs?.consistency?.issues || []).forEach(i => lines.push(`• ${i}`));
         lines.push("");
         lines.push("DISCLAIMER");
         lines.push("This is AI-generated legal intelligence, not legal advice. Karrar.ai is not a law firm.");
@@ -397,12 +341,12 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
     const NAV = [
         { k: "Home", ic: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg> },
         { k: "Contracts", ic: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>, badge: contractHistory.length || null },
-        { k: "Agents", ic: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg> },
+
         { k: "Reports", ic: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg> },
     ];
 
     return (
-        <div style={{ fontFamily: "DM Sans,sans-serif", background: "#070809", color: "#FFF", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ fontFamily: "DM Sans,sans-serif", background: "#000000", color: "#FFF", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
             <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -442,8 +386,9 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
         .dash-analysis-agents { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
 
         /* ── DASHBOARD TOP NAV ── */
-        .dash-topnav { display:flex; gap:1px; flex:1; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        .dash-topnav { display:none; gap:1px; flex:1; overflow-x:auto; -webkit-overflow-scrolling:touch; }
         .dash-topnav::-webkit-scrollbar { display:none; }
+        .dash-spacer { flex: 1; }
         .dash-search-box { position:relative; }
         .dash-plan-btn, .dash-notif-btn, .dash-user-btn { flex-shrink: 0; }
 
@@ -457,8 +402,9 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
           .dash-plan-btn { display:none !important; }
           .dash-notif-btn { display:none !important; }
           .dash-user-btn span { display:none !important; }
+          .dash-spacer { display:none !important; }
 
-          .dash-topnav { gap:0; flex:1; min-width:0; }
+          .dash-topnav { display:flex !important; gap:0; flex:1; min-width:0; }
           .dash-topnav button { padding:4px 8px !important; font-size:12px !important; white-space:nowrap; }
 
           .dash-main { padding:16px 12px !important; }
@@ -478,7 +424,6 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
             <AnimatePresence>
                 {showDisclaimer && <DisclaimerModal onAccept={handleDisclaimerAccept} />}
                 {showLawyerWarn && analysis && <LawyerWarningModal analysis={analysis} onContinue={() => { setShowLawyerWarn(false); setActiveNav("Reports"); }} onLawyer={() => { setShowLawyerWarn(false); setActiveNav("Reports"); setReportTab("decision"); setUserDecision("lawyer"); }} />}
-                {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
             </AnimatePresence>
 
             {/* ── TOPNAV ─────────────────────────────────────────────────── */}
@@ -492,59 +437,12 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
                         </button>
                     ))}
                 </div>
+                <div className="dash-spacer" />
                 <div className="dash-search-box">
                     <svg style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)" }} width="12" height="12" fill="none" stroke="#333" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                    <input placeholder="Search contracts…" style={{ background: "#0D0F13", border: "1px solid #131518", borderRadius: 8, padding: "6px 12px 6px 28px", color: "#777", fontSize: 12, fontFamily: "DM Sans,sans-serif", outline: "none", width: 164 }} />
+                    <input placeholder="Search contracts…" style={{ background: "#0A0B0E", border: "1px solid #1A1D22", borderRadius: 8, padding: "6px 12px 6px 28px", color: "#AAA", fontSize: 13, fontFamily: "DM Sans,sans-serif", outline: "none", width: 180, transition: "border-color 0.2s" }} onFocus={e => e.target.style.borderColor = "#C49E6C"} onBlur={e => e.target.style.borderColor = "#1A1D22"} />
                 </div>
-                {/* Plan Dropdown */}
-                <div className="dash-plan-btn" style={{ position: "relative" }} onMouseLeave={() => setPlanDropdownOpen(false)}>
-                    <button
-                        onClick={() => setPlanDropdownOpen(!planDropdownOpen)}
-                        style={{ background: "transparent", border: "1px solid #1E2228", borderRadius: 8, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "background 0.2s" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "rgba(196,158,108,0.08)"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                    >
-                        {isPro ? (
-                            <span style={{ fontSize: 10, color: "#C49E6C", fontFamily: "IBM Plex Mono,monospace", fontWeight: 600 }}>PRO ∞</span>
-                        ) : (
-                            <span style={{ fontSize: 11, color: analysesLeft <= 1 ? "#ef4444" : "#CCC", fontFamily: "IBM Plex Mono,monospace", whiteSpace: "nowrap" }}>{analysesLeft}/{analysesLimit} left</span>
-                        )}
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#777" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
-                    </button>
 
-                    <AnimatePresence>
-                        {planDropdownOpen && (
-                            <motion.div
-                                initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}
-                                style={{ position: "absolute", top: "100%", right: 0, marginTop: 8, width: 220, background: "#0D0F13", border: "1px solid #1A1D22", borderRadius: 12, padding: 16, zIndex: 400, boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}
-                            >
-                                <div style={{ fontSize: 10, color: "#C49E6C", fontFamily: "IBM Plex Mono,monospace", letterSpacing: "0.1em", marginBottom: 6 }}>YOUR PLAN</div>
-                                <div style={{ fontFamily: "Playfair Display,serif", fontSize: 18, fontWeight: 700, color: "#FFF", marginBottom: 4 }}>
-                                    {isPro ? "Pro (Unlimited)" : "Free Plan"}
-                                </div>
-                                <div style={{ fontSize: 12, color: "#777", marginBottom: 16 }}>
-                                    {isPro ? "Unlimited AI analyses and features." : `You have ${analysesLeft} of ${analysesLimit} analyses left this month.`}
-                                </div>
-                                {!isPro && (
-                                    <button
-                                        onClick={() => { setPlanDropdownOpen(false); setShowUpgrade(true); }}
-                                        style={{ width: "100%", padding: "8px 0", background: "linear-gradient(135deg,#C49E6C,#F5D08A)", border: "none", borderRadius: 8, color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "DM Sans,sans-serif" }}
-                                    >
-                                        Upgrade to Pro →
-                                    </button>
-                                )}
-                                {isPro && (
-                                    <button
-                                        onClick={() => { setPlanDropdownOpen(false); }}
-                                        style={{ width: "100%", padding: "8px 0", background: "transparent", border: "1px solid rgba(196,158,108,0.3)", borderRadius: 8, color: "#C49E6C", fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: "DM Sans,sans-serif" }}
-                                    >
-                                        Manage Subscription
-                                    </button>
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
                 <div className="dash-notif-btn" style={{ position: "relative" }}>
                     <button onClick={() => setNotifOpen(!notifOpen)} style={{ background: "none", border: "none", cursor: "pointer", color: notifOpen ? "#C49E6C" : "#444", padding: 5, position: "relative", transition: "color 0.17s" }}>
                         <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" /></svg>
@@ -592,20 +490,21 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
 
                     {/* NAV ITEMS — icon-only when collapsed, full when expanded */}
                     <div style={{ padding: collapsed ? "8px 0" : "4px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
-                        {NAV.map(({ k, ic, badge }) => (
+                        {NAV.map(({ k, ic, badge, locked }) => (
                             collapsed ? (
                                 /* Collapsed: icon-only pill with tooltip */
-                                <div key={k} title={k} onClick={() => setActiveNav(k)}
-                                    style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", width: 36, height: 36, borderRadius: 9, margin: "1px auto", cursor: "pointer", background: activeNav === k ? "rgba(196,158,108,0.12)" : "transparent", border: activeNav === k ? "1px solid rgba(196,158,108,0.25)" : "1px solid transparent", transition: "all 0.17s", color: activeNav === k ? "#C49E6C" : "#444" }}
-                                    onMouseEnter={e => { if (activeNav !== k) { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "#AAA"; } }}
-                                    onMouseLeave={e => { if (activeNav !== k) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#444"; } }}>
-                                    <span style={{ opacity: activeNav === k ? 1 : 0.6, fontSize: 0, display: "flex" }}>{ic}</span>
-                                    {badge && <span style={{ position: "absolute", top: 3, right: 3, width: 8, height: 8, background: "#C49E6C", borderRadius: "50%", fontSize: 0 }} />}
+                                <div key={k} title={locked ? `${k} — Coming Soon` : k} onClick={() => { if (!locked) setActiveNav(k); }}
+                                    style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", width: 36, height: 36, borderRadius: 9, margin: "1px auto", cursor: locked ? "not-allowed" : "pointer", background: activeNav === k && !locked ? "rgba(196,158,108,0.12)" : "transparent", border: activeNav === k && !locked ? "1px solid rgba(196,158,108,0.25)" : "1px solid transparent", transition: "all 0.17s", color: locked ? "#222" : (activeNav === k ? "#C49E6C" : "#444"), opacity: locked ? 0.45 : 1 }}
+                                    onMouseEnter={e => { if (activeNav !== k && !locked) { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "#AAA"; } }}
+                                    onMouseLeave={e => { if (activeNav !== k && !locked) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#444"; } }}>
+                                    <span style={{ opacity: activeNav === k && !locked ? 1 : 0.6, fontSize: 0, display: "flex" }}>{ic}</span>
+                                    {badge && !locked && <span style={{ position: "absolute", top: 3, right: 3, width: 8, height: 8, background: "#C49E6C", borderRadius: "50%", fontSize: 0 }} />}
                                 </div>
                             ) : (
-                                <div key={k} className={`snav${activeNav === k ? " on" : ""}`} onClick={() => setActiveNav(k)}>
-                                    <span style={{ opacity: activeNav === k ? 1 : 0.35 }}>{ic}</span>{k}
-                                    {badge && <span style={{ marginLeft: "auto", background: "rgba(196,158,108,0.15)", color: "#C49E6C", borderRadius: 10, padding: "0 6px", fontSize: 10, fontFamily: "IBM Plex Mono,monospace" }}>{badge}</span>}
+                                <div key={k} className={`snav${activeNav === k && !locked ? " on" : ""}`} onClick={() => { if (!locked) setActiveNav(k); }} style={locked ? { opacity: 0.45, cursor: "not-allowed" } : {}}>
+                                    <span style={{ opacity: activeNav === k && !locked ? 1 : 0.35 }}>{ic}</span>{k}
+                                    {locked && <LockIcon size={10} />}
+                                    {badge && !locked && <span style={{ marginLeft: "auto", background: "rgba(196,158,108,0.15)", color: "#C49E6C", borderRadius: 10, padding: "0 6px", fontSize: 10, fontFamily: "IBM Plex Mono,monospace" }}>{badge}</span>}
                                 </div>
                             )
                         ))}
@@ -622,13 +521,7 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
                                     <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /></svg>{f}
                                 </div>
                             ))}
-                            <div style={{ height: 1, background: "#0F1115", margin: "12px 0" }} />
-                            <div style={{ fontSize: 9, color: "#222", fontFamily: "IBM Plex Mono,monospace", letterSpacing: "0.12em", paddingLeft: 4, marginBottom: 7 }}>TOP ENTITIES</div>
-                            {[{ l: "Indian Ministries", c: "#ef4444" }, { l: "Freelancer Y", c: "#3b82f6" }].map((e, i) => (
-                                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", cursor: "pointer", fontSize: 12, color: "#333", borderRadius: 7, transition: "color 0.17s" }} onMouseEnter={ev => ev.currentTarget.style.color = "#AAA"} onMouseLeave={ev => ev.currentTarget.style.color = "#333"}>
-                                    <div style={{ width: 15, height: 15, borderRadius: 4, background: e.c, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, fontWeight: 700, color: "#fff", flexShrink: 0 }}>IN</div>{e.l}
-                                </div>
-                            ))}
+
                         </div>
                     )}
 
@@ -640,10 +533,7 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
                                 onMouseEnter={e => e.currentTarget.style.color = "#888"} onMouseLeave={e => e.currentTarget.style.color = "#333"}>
                                 <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
                             </div>
-                            {/* Entity dots */}
-                            {[{ c: "#ef4444", t: "Indian Ministries" }, { c: "#3b82f6", t: "Freelancer Y" }].map((e, i) => (
-                                <div key={i} title={e.t} style={{ width: 22, height: 22, borderRadius: 5, background: e.c, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, fontWeight: 700, color: "#fff", cursor: "pointer", opacity: 0.6 }}>IN</div>
-                            ))}
+
                         </div>
                     )}
                 </aside>
@@ -695,37 +585,23 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
 
                                 {/* Upload zone or locked */}
                                 {uploadPhase === "idle" && (
-                                    !isPro && analysesUsed >= analysesLimit ? (
-                                        <div className="locked-zone">
-                                            <div className="uzone" style={{ opacity: 0.3, pointerEvents: "none" }}>
-                                                <div style={{ fontSize: 14, color: "#CCC" }}>Upload Contract</div>
-                                            </div>
-                                            <div className="locked-overlay">
-                                                <div style={{ fontSize: 24 }}><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></div>
-                                                <div style={{ fontSize: 14, fontWeight: 600, color: "#CCC" }}>Monthly limit reached</div>
-                                                <div style={{ fontSize: 12, color: "#555" }}>You've used all {analysesLimit} free analyses this month</div>
-                                                <motion.button whileHover={{ scale: 1.04 }} className="gbtn" onClick={() => setShowUpgrade(true)}>Upgrade to Pro →</motion.button>
-                                            </div>
+                                    <div className="uzone" onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("drag"); }} onDragLeave={e => e.currentTarget.classList.remove("drag")} onDrop={handleFile} onClick={() => fileRef.current?.click()}>
+                                        <input ref={fileRef} type="file" style={{ display: "none" }} accept=".pdf,.doc,.docx" onChange={handleFile} />
+                                        <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }} style={{ marginBottom: 14 }}>
+                                            <svg width="44" height="44" fill="none" stroke="rgba(196,158,108,0.4)" strokeWidth="1.5" viewBox="0 0 24 24" style={{ display: "block", margin: "0 auto" }}>
+                                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
+                                                <line x1="12" y1="18" x2="12" y2="12" /><polyline points="9 15 12 12 15 15" />
+                                            </svg>
+                                        </motion.div>
+                                        <div style={{ fontSize: 15, fontWeight: 600, color: "#CCC", marginBottom: 6 }}>Upload Contract — Real AI Analysis</div>
+                                        <div style={{ fontSize: 13, color: "#333", marginBottom: 19 }}>Drag &amp; drop or click · PDF / DOCX · Analyzed by Claude AI grounded in Indian law</div>
+                                        <div style={{ display: "flex", gap: 9, justifyContent: "center", flexWrap: "wrap", marginBottom: 18 }}>
+                                            {["Completeness", "Risk Scoring", "Negotiation", "Consistency", "Regulatory", "Explanation"].map(a => (
+                                                <span key={a} style={{ background: "rgba(196,158,108,0.07)", border: "1px solid rgba(196,158,108,0.15)", color: "#888", padding: "4px 10px", borderRadius: 22, fontSize: 11, fontFamily: "IBM Plex Mono,monospace" }}>{a}</span>
+                                            ))}
                                         </div>
-                                    ) : (
-                                        <div className="uzone" onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("drag"); }} onDragLeave={e => e.currentTarget.classList.remove("drag")} onDrop={handleFile} onClick={() => fileRef.current?.click()}>
-                                            <input ref={fileRef} type="file" style={{ display: "none" }} accept=".pdf,.doc,.docx" onChange={handleFile} />
-                                            <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }} style={{ marginBottom: 14 }}>
-                                                <svg width="44" height="44" fill="none" stroke="rgba(196,158,108,0.4)" strokeWidth="1.5" viewBox="0 0 24 24" style={{ display: "block", margin: "0 auto" }}>
-                                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
-                                                    <line x1="12" y1="18" x2="12" y2="12" /><polyline points="9 15 12 12 15 15" />
-                                                </svg>
-                                            </motion.div>
-                                            <div style={{ fontSize: 15, fontWeight: 600, color: "#CCC", marginBottom: 6 }}>Upload Contract — Real AI Analysis</div>
-                                            <div style={{ fontSize: 13, color: "#333", marginBottom: 19 }}>Drag &amp; drop or click · PDF / DOCX · Analyzed by Claude AI grounded in Indian law</div>
-                                            <div style={{ display: "flex", gap: 9, justifyContent: "center", flexWrap: "wrap", marginBottom: 18 }}>
-                                                {["Completeness", "Risk Scoring", "Negotiation", "Consistency", "Regulatory", "Explanation"].map(a => (
-                                                    <span key={a} style={{ background: "rgba(196,158,108,0.07)", border: "1px solid rgba(196,158,108,0.15)", color: "#888", padding: "4px 10px", borderRadius: 22, fontSize: 11, fontFamily: "IBM Plex Mono,monospace" }}>{a}</span>
-                                                ))}
-                                            </div>
-                                            <motion.button whileHover={{ scale: 1.04, boxShadow: "0 0 24px rgba(196,158,108,0.35)" }} whileTap={{ scale: 0.97 }} className="gbtn" style={{ fontSize: 14, padding: "10px 18px" }} onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}>Choose Contract File</motion.button>
-                                        </div>
-                                    )
+                                        <motion.button whileHover={{ scale: 1.04, boxShadow: "0 0 24px rgba(196,158,108,0.35)" }} whileTap={{ scale: 0.97 }} className="gbtn" style={{ fontSize: 14, padding: "10px 18px" }} onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}>Choose Contract File</motion.button>
+                                    </div>
                                 )}
 
                                 {uploadPhase === "analyzing" && (
@@ -774,13 +650,13 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
                                         </div>
 
                                         {/* Missing docs prompt */}
-                                        {analysis.agentOutputs.completeness.missing.length > 0 && (
+                                        {(analysis.agentOutputs?.completeness?.missing?.length || 0) > 0 && (
                                             <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 11, padding: "12px 14px", marginBottom: 14 }}>
                                                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 9 }}>
                                                     <svg width="16" height="16" fill="none" stroke="#f59e0b" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
                                                     <span style={{ fontSize: 12, fontWeight: 600, color: "#f59e0b" }}>Missing Documents — Upload to improve analysis accuracy</span>
                                                 </div>
-                                                {analysis.agentOutputs.completeness.missing.map((m, i) => (
+                                                {(analysis.agentOutputs?.completeness?.missing || []).map((m, i) => (
                                                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
                                                         {uploadedMissing[m] ? (
                                                             <span style={{ fontSize: 11, color: "#22c55e", display: "flex", alignItems: "center", gap: 5 }}>
@@ -810,15 +686,11 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
                                                 </div>
                                             ))}
                                         </div>
-                                        <div style={{ border: "1px dashed rgba(196,158,108,0.15)", borderRadius: 11, padding: "12px 15px", display: "flex", alignItems: "center", gap: 13, cursor: "pointer", marginBottom: 12, transition: "all 0.2s" }}
-                                            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(196,158,108,0.38)"; e.currentTarget.style.background = "rgba(196,158,108,0.02)"; }}
-                                            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(196,158,108,0.15)"; e.currentTarget.style.background = "transparent"; }}
-                                            onClick={() => relatedRef.current?.click()}>
-                                            <input ref={relatedRef} type="file" multiple style={{ display: "none" }} onChange={e => { setRelatedDocs(p => [...p, ...Array.from(e.target.files).map(f => f.name)]); }} />
-                                            <svg width="18" height="18" fill="none" stroke="rgba(196,158,108,0.45)" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><polyline points="9 15 12 12 15 15" /></svg>
-                                            <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600, color: "#CCC" }}>Upload Related Documents</div><div style={{ fontSize: 11, color: "#333", marginTop: 1 }}>Annexures, SLAs, prior versions, exhibits…</div></div>
-                                            <div style={{ background: "rgba(196,158,108,0.07)", border: "1px solid rgba(196,158,108,0.18)", borderRadius: 6, padding: "4px 11px", fontSize: 11, color: "#C49E6C" }}>Browse</div>
-                                        </div>
+                                            <div style={{ border: "1px dashed rgba(196,158,108,0.15)", borderRadius: 11, padding: "12px 15px", display: "flex", alignItems: "center", gap: 13, marginBottom: 12 }}>
+                                                <svg width="18" height="18" fill="none" stroke="rgba(196,158,108,0.45)" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><polyline points="9 15 12 12 15 15" /></svg>
+                                                <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600, color: "#CCC" }}>Upload Related Documents</div><div style={{ fontSize: 11, color: "#333", marginTop: 1 }}>Annexures, SLAs, prior versions, exhibits…</div></div>
+                                                <div style={{ background: "rgba(196,158,108,0.07)", border: "1px solid rgba(196,158,108,0.18)", borderRadius: 6, padding: "4px 11px", fontSize: 11, color: "#C49E6C" }}>Browse</div>
+                                            </div>
                                         {relatedDocs.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 12 }}>{relatedDocs.map((d, i) => <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.16)", borderRadius: 6, padding: "3px 9px", fontSize: 11, color: "#22c55e" }}><svg width="8" height="8" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>{d}</div>)}</div>}
                                         <div style={{ display: "flex", gap: 9 }}>
                                             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="gbtn" style={{ flex: 1, fontSize: 14, padding: "12px" }} onClick={openReport}>
@@ -909,7 +781,7 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
                                                             e.stopPropagation();
                                                             const newHistory = contractHistory.filter(item => item.id !== c.id);
                                                             setContractHistory(newHistory);
-                                                            Store.set("contracts-history", newHistory);
+                                                            // No persistence — data resets on refresh
 
                                                             // If we are currently viewing this analysis in the right sidebar, clear it out
                                                             if (analysis && analysis.id === c.analysis.id) {
@@ -927,136 +799,6 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
                             </motion.div>
                         )}
 
-                        {/* ═══ AGENTS ARCHITECTURE ═══════════════════════════════ */}
-                        {activeNav === "Agents" && (
-                            <motion.div key="agents" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.38 }}>
-                                <div style={{ marginBottom: 24 }}>
-                                    <h1 style={{ fontFamily: "Playfair Display,serif", fontSize: 29, fontWeight: 700, marginBottom: 2 }}>Swarm Architecture</h1>
-                                    <p style={{ fontSize: 14, color: "#444" }}>How your contracts are analyzed by 6 specialized AI models concurrently.</p>
-                                </div>
-                                <div className="dash-agents-grid">
-                                    {AGENTS.map((a, i) => {
-                                        const isHovered = hoveredAgent === a.id;
-
-                                        const getAgentMetrics = () => {
-                                            if (!analysis) return null;
-                                            const out = analysis.agentOutputs;
-                                            switch (a.id) {
-                                                case "completeness":
-                                                    const c = out.completeness;
-                                                    return (
-                                                        <>
-                                                            <div style={{ marginBottom: isHovered && c.missing.length > 0 ? 8 : 0 }}>
-                                                                <strong style={{ color: "#3b82f6" }}>Score: {c.score}%</strong> · {c.status} · Missing: {c.missing.length} documents
-                                                            </div>
-                                                            {isHovered && c.missing.length > 0 && <div style={{ fontSize: 12, color: "#888", marginTop: 6, paddingLeft: 8, borderLeft: "2px solid #3b82f644" }}>Missing: {c.missing.join(", ")}</div>}
-                                                        </>
-                                                    );
-                                                case "risk":
-                                                    const r = out.risk;
-                                                    return (
-                                                        <>
-                                                            <div style={{ marginBottom: isHovered && r.topRisk ? 8 : 0 }}>
-                                                                <strong style={{ color: "#ef4444" }}>Risk: {r.score}/10</strong> · Critical: {r.critical} · High: {r.high} · Medium: {r.medium} · Low: {r.low}
-                                                            </div>
-                                                            {isHovered && r.topRisk && <div style={{ fontSize: 12, color: "#888", marginTop: 6, paddingLeft: 8, borderLeft: "2px solid #ef444444" }}>Top Risk: {r.topRisk}</div>}
-                                                        </>
-                                                    );
-                                                case "negotiation":
-                                                    const n = out.negotiation;
-                                                    return (
-                                                        <>
-                                                            <div style={{ marginBottom: isHovered && n.strategy ? 8 : 0 }}>
-                                                                <strong style={{ color: "#C49E6C" }}>{n.counterTermsGenerated} counter-terms</strong> generated · Leverage: {n.mostLeverageClause}
-                                                            </div>
-                                                            {isHovered && n.strategy && <div style={{ fontSize: 12, color: "#888", marginTop: 6, paddingLeft: 8, borderLeft: "2px solid #C49E6C44" }}>Strategy: {n.strategy}</div>}
-                                                        </>
-                                                    );
-                                                case "consistency":
-                                                    const con = out.consistency;
-                                                    return (
-                                                        <>
-                                                            <div style={{ marginBottom: isHovered && con.issues.length > 0 ? 8 : 0 }}>
-                                                                <strong style={{ color: "#8b5cf6" }}>{con.contradictions} contradictions</strong> · {con.issues.filter(Boolean).length > 0 ? "Flagged varying clauses" : "No major issues"}
-                                                            </div>
-                                                            {isHovered && con.issues.length > 0 && <div style={{ fontSize: 12, color: "#888", marginTop: 6, paddingLeft: 8, borderLeft: "2px solid #8b5cf644" }}>{con.issues.join(" · ")}</div>}
-                                                        </>
-                                                    );
-                                                case "regulatory":
-                                                    const reg = out.regulatory;
-                                                    return (
-                                                        <>
-                                                            <div style={{ marginBottom: isHovered && reg.violations.length > 0 ? 8 : 0 }}>
-                                                                <strong style={{ color: "#22c55e" }}>Compliance: {reg.complianceScore}%</strong> · {reg.violations.length} violations · {reg.jurisdiction}
-                                                            </div>
-                                                            {isHovered && reg.violations.length > 0 && <div style={{ fontSize: 12, color: "#888", marginTop: 6, paddingLeft: 8, borderLeft: "2px solid #22c55e44" }}>{reg.violations[0]}{reg.violations.length > 1 ? "..." : ""}</div>}
-                                                        </>
-                                                    );
-                                                case "explanation":
-                                                    const e = out.explanation;
-                                                    return (
-                                                        <>
-                                                            <div style={{ marginBottom: isHovered && e.summary ? 8 : 0 }}>
-                                                                <strong style={{ color: "#f59e0b" }}>Readability: {e.readabilityScore}/100</strong> · Grade: {e.grade}
-                                                            </div>
-                                                            {isHovered && e.summary && <div style={{ fontSize: 12, color: "#888", marginTop: 6, paddingLeft: 8, borderLeft: "2px solid #f59e0b44", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{e.summary}</div>}
-                                                        </>
-                                                    );
-                                                default: return null;
-                                            }
-                                        };
-
-                                        return (
-                                            <motion.div key={a.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                                                onHoverStart={() => setHoveredAgent(a.id)}
-                                                onHoverEnd={() => setHoveredAgent(null)}
-                                                style={{ padding: "18px 20px", borderRadius: "14px", background: "#0A0B0E", border: `1px solid ${isHovered ? a.color + "44" : "#1A1D22"}`, display: "flex", flexDirection: "column", gap: "14px", transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)", cursor: "default", boxShadow: isHovered ? `0 8px 24px -8px ${a.color}15` : "none" }}
-                                            >
-                                                <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
-                                                    <div style={{ width: 42, height: 42, borderRadius: 10, background: `${a.color}10`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: a.color, flexShrink: 0, border: `1px solid ${a.color}22` }}>
-                                                        {a.icon}
-                                                    </div>
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                                            <div style={{ fontSize: 15, fontWeight: 700, color: "#EAEAEA", marginBottom: 3 }}>
-                                                                {a.name}
-                                                            </div>
-                                                            {analysis && (
-                                                                <div style={{ fontSize: 10, fontWeight: 700, color: a.color, background: `${a.color}0A`, border: `1px solid ${a.color}25`, padding: "3px 8px", borderRadius: 20, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                                                                    Active
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div style={{ fontSize: 12, color: "#777", lineHeight: 1.4 }}>
-                                                            {a.desc}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {analysis && (
-                                                    <motion.div layout style={{ borderTop: "1px solid #1A1D22", paddingTop: "14px", fontSize: 12, color: "#888", lineHeight: 1.5 }}>
-                                                        {getAgentMetrics()}
-                                                    </motion.div>
-                                                )}
-                                            </motion.div>
-                                        );
-                                    })}
-                                </div>
-                                {/* Visual diagram */}
-                                <div style={{ marginTop: 20, background: "#0A0B0E", border: "1px solid #131518", borderRadius: 14, padding: "24px", position: "relative", overflow: "hidden" }}>
-                                    <div style={{ fontSize: 10, color: "#C49E6C", fontFamily: "IBM Plex Mono,monospace", letterSpacing: "0.1em", marginBottom: 12 }}>TECH STACK</div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                                        {[{ n: "Claude AI", c: "#C49E6C" }, { n: "LangGraph", c: "#8b5cf6" }, { n: "FastAPI", c: "#22c55e" }, { n: "PyMuPDF", c: "#3b82f6" }, { n: "FAISS RAG", c: "#f59e0b" }, { n: "ICA 1872", c: "#ef4444" }, { n: "DPDP 2023", c: "#ef4444" }].map((s, i, arr) => (
-                                            <Fragment key={i}>
-                                                <div style={{ background: `${s.c}10`, border: `1px solid ${s.c}28`, borderRadius: 8, padding: "5px 12px", fontSize: 11, color: s.c, fontWeight: 500 }}>{s.n}</div>
-                                                {i < arr.length - 1 && <span style={{ color: "#222", fontSize: 12 }}>·</span>}
-                                            </Fragment>
-                                        ))}
-                                    </div>
-                                    <div style={{ fontSize: 12, color: "#333", lineHeight: 1.8 }}>All 6 agents run <strong style={{ color: "#C49E6C" }}>in parallel</strong> via Orchestrator Dispatch. Each output is tagged with confidence scores and synthesized into one unified report ranked by severity.</div>
-                                </div>
-                            </motion.div>
-                        )}
 
                         {/* ═══ REPORTS ═══════════════════════════════════════════ */}
                         {activeNav === "Reports" && (
@@ -1153,12 +895,10 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
                                                 </div>
                                             </div>
                                             <div style={{ display: "flex", gap: 8 }}>
-                                                <button className="qbtn" style={{ fontSize: 11, padding: "6px 13px" }} onClick={exportPDF}>⬇ Export</button>
-                                                <motion.button whileHover={{ scale: 1.03 }} className="gbtn" style={{ fontSize: 11, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6 }} onClick={() => copy(analysis.agentOutputs.explanation.summary, "report-copy")}>
-                                                    {copiedId === "report-copy" ?
-                                                        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg> Copied!</span>
-                                                        : <span style={{ display: "flex", alignItems: "center", gap: 4 }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg> Copy Summary</span>}
-                                                </motion.button>
+                                                <button className="qbtn" style={{ fontSize: 11, padding: "6px 13px" }}>⬇ Export</button>
+                                                <button className="qbtn" style={{ fontSize: 11, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6 }}>
+                                                    <span style={{ display: "flex", alignItems: "center", gap: 4 }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg> Copy Summary</span>
+                                                </button>
                                             </div>
                                         </div>
 
@@ -1233,9 +973,15 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
                                                 { k: "consistency", l: <div style={{ display: "flex", alignItems: "center", gap: 6 }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>Consistency</div> },
                                                 { k: "decision", l: <div style={{ display: "flex", alignItems: "center", gap: 6 }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>My Decision</div> },
                                                 { k: "draft", l: <div style={{ display: "flex", alignItems: "center", gap: 6 }}><svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>Draft Doc</div> }
-                                            ].map(({ k, l }) => (
-                                                <button key={k} className={`tbtn ${reportTab === k ? "on" : "off"}`} onClick={() => setReportTab(k)}>{l}</button>
-                                            ))}
+                                            ].map(({ k, l }) => {
+                                                return (
+                                                    <button key={k} className={`tbtn ${reportTab === k ? "on" : "off"}`}
+                                                        onClick={() => { setReportTab(k); }}
+                                                    >
+                                                        {l}
+                                                    </button>
+                                                );
+                                            })}
                                             {(reportTab === "risks" || reportTab === "plain" || reportTab === "counter") && (
                                                 <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
                                                     {["All", "Critical", "High", "Medium", "Low"].map(r => (
@@ -1782,28 +1528,10 @@ Ground all findings in Indian Contract Act 1872, DPDP Act 2023, and Indian statu
                         </div>
                     </div>
 
-                    {/* ── USER PLAN ── */}
-                    <div style={{ padding: "16px 18px 20px", flex: 1 }}>
-                        <div style={{ fontSize: 10, color: "#C49E6C", fontFamily: "IBM Plex Mono,monospace", letterSpacing: "0.12em", fontWeight: 600, marginBottom: 12 }}>USER PLAN</div>
-                        <div style={{ background: "#0A0B0E", border: `1px solid ${isPro ? "rgba(196,158,108,0.25)" : "#131518"}`, borderRadius: 11, padding: "14px" }}>
-                            <div style={{ fontFamily: "Playfair Display,serif", fontSize: 15, fontWeight: 700, color: isPro ? "#C49E6C" : "#CCC", marginBottom: 3 }}>
-                                {isPro ? "Pro — Unlimited" : "Free Plan"}
-                            </div>
-                            <div style={{ fontSize: 11, color: "#555", marginBottom: isPro ? 0 : 12 }}>
-                                {isPro ? "Unlimited analyses · Full history · Export" : `${analysesLeft} of ${analysesLimit} analyses left this month`}
-                            </div>
-                            {!isPro && (
-                                <motion.button whileHover={{ scale: 1.03 }} className="gbtn"
-                                    style={{ width: "100%", fontSize: 11, padding: "8px", marginTop: 2 }}
-                                    onClick={() => setShowUpgrade(true)}>
-                                    Upgrade to Pro →
-                                </motion.button>
-                            )}
-                        </div>
-                    </div>
+
                 </aside >
                 {/* ── END OF MAIN CONTENT AND RIGHT PANEL */}
             </div>
-        </div>
+        </div >
     );
 }
