@@ -5,11 +5,11 @@ Pure-Python implementation of the AI Legal Contract Risk Analysis pipeline.
 Replaces the previous n8n webhook-based workflow with direct OpenRouter calls.
 
 Agents (all use arcee-ai/trinity-large-preview:free via OpenRouter):
-  1. Risk Assessment Agent       — per-clause risk scoring      (API Key 1)
-  2. Explanation Agent           — per-clause plain-English      (API Key 2)
-  3. Counter-Terms Agent         — per-clause (negotiable only)  (API Key 1)
-  4. Global Explanation Agent    — full-contract summary         (API Key 2)
-  5. Regulatory Compliance Agent — full-contract legal check     (API Key 2)
+  1. Risk Assessment Agent       — per-clause risk scoring      (Karrarayush07)
+  2. Explanation Agent           — per-clause plain-English      (KarrarNavsafe)
+  3. Counter-Terms Agent         — per-clause (negotiable only)  (KarrarAyushgirizoho)
+  4. Global Explanation Agent    — full-contract summary         (KarrarGiriayushzoho)
+  5. Regulatory Compliance Agent — full-contract legal check     (KarrarAvi)
 """
 
 import asyncio
@@ -49,10 +49,12 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Key 1  →  Risk Assessment + Counter-Terms agents
-API_KEY_1 = os.getenv("OPENROUTER_API_KEY_1", "")
-# Key 2  →  Explanation + Global Explanation + Regulatory Compliance agents
-API_KEY_2 = os.getenv("OPENROUTER_API_KEY_2", "")
+# One dedicated key per agent for better rate-limit distribution
+API_KEY_RISK       = os.getenv("OPENROUTER_API_KEY_RISK", "")        # Agent 1 — Risk Assessment
+API_KEY_EXPLAIN    = os.getenv("OPENROUTER_API_KEY_EXPLAIN", "")     # Agent 2 — Explanation
+API_KEY_COUNTER    = os.getenv("OPENROUTER_API_KEY_COUNTER", "")     # Agent 3 — Counter-Terms
+API_KEY_GLOBAL     = os.getenv("OPENROUTER_API_KEY_GLOBAL", "")      # Agent 4 — Global Explanation
+API_KEY_COMPLIANCE = os.getenv("OPENROUTER_API_KEY_COMPLIANCE", "")  # Agent 5 — Regulatory Compliance
 
 MODEL = os.getenv("OPENROUTER_MODEL", "arcee-ai/trinity-large-preview:free")
 
@@ -158,7 +160,7 @@ async def assess_risk(clause_text: str, clause_index: int) -> Dict[str, Any]:
         "75-100=Critical,50-74=High,25-49=Medium,0-24=Low\n"
         f"Clause:{clause_text}"
     )
-    parsed = await call_openrouter(API_KEY_1, prompt)
+    parsed = await call_openrouter(API_KEY_RISK, prompt)
 
     if parsed is None:
         parsed = {
@@ -185,7 +187,7 @@ async def explain_clause(clause_text: str, clause_index: int) -> Dict[str, Any]:
         '{"plain":"<explanation>","freelancerImpact":"<positive|negative|neutral>"}\n'
         f"Clause:{clause_text}"
     )
-    parsed = await call_openrouter(API_KEY_2, prompt)
+    parsed = await call_openrouter(API_KEY_EXPLAIN, prompt)
 
     if parsed is None:
         parsed = {
@@ -212,7 +214,7 @@ async def generate_counter_term(
         '{"counter":"<replacement clause>","negotiationTip":"<one sentence tip>"}\n'
         f"Clause:{clause_text}"
     )
-    parsed = await call_openrouter(API_KEY_1, prompt, temperature=0.2, max_tokens=1500)
+    parsed = await call_openrouter(API_KEY_COUNTER, prompt, temperature=0.2, max_tokens=1500)
 
     if parsed is None:
         parsed = {"counter": None, "negotiationTip": ""}
@@ -239,7 +241,7 @@ async def analyze_global(full_text: str) -> Dict[str, Any]:
         "80-100=A,60-79=B,40-59=C,20-39=D,0-19=F\n"
         f"Contract:{full_text}"
     )
-    parsed = await call_openrouter(API_KEY_2, prompt)
+    parsed = await call_openrouter(API_KEY_GLOBAL, prompt)
 
     if parsed is None:
         parsed = {
@@ -270,7 +272,7 @@ async def check_compliance(full_text: str) -> Dict[str, Any]:
         '"strategy":"<one sentence strategy>"}\n'
         f"Contract:{full_text}"
     )
-    parsed = await call_openrouter(API_KEY_2, prompt, max_tokens=2000)
+    parsed = await call_openrouter(API_KEY_COMPLIANCE, prompt, max_tokens=2000)
 
     if parsed is None:
         parsed = {
@@ -459,10 +461,20 @@ async def analyze_contract(file: UploadFile = File(...)):
         )
 
     # --- Validate API keys ---
-    if not API_KEY_1 or not API_KEY_2:
+    missing_keys = []
+    for name, val in [
+        ("OPENROUTER_API_KEY_RISK", API_KEY_RISK),
+        ("OPENROUTER_API_KEY_EXPLAIN", API_KEY_EXPLAIN),
+        ("OPENROUTER_API_KEY_COUNTER", API_KEY_COUNTER),
+        ("OPENROUTER_API_KEY_GLOBAL", API_KEY_GLOBAL),
+        ("OPENROUTER_API_KEY_COMPLIANCE", API_KEY_COMPLIANCE),
+    ]:
+        if not val:
+            missing_keys.append(name)
+    if missing_keys:
         raise HTTPException(
             status_code=500,
-            detail="OpenRouter API keys are not configured. Set OPENROUTER_API_KEY_1 and OPENROUTER_API_KEY_2 in .env",
+            detail=f"Missing OpenRouter API keys: {', '.join(missing_keys)}. Set them in .env",
         )
 
     # --- Read & parse PDF ---
