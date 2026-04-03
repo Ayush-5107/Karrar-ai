@@ -7,7 +7,7 @@ Replaces the previous n8n webhook-based workflow with direct OpenRouter calls.
 Agents (all use arcee-ai/trinity-large-preview:free via OpenRouter):
   1. Risk Assessment Agent       — per-clause risk scoring      (Karrarayush07)
   2. Explanation Agent           — per-clause plain-English      (KarrarNavsafe)
-  3. Counter-Terms Agent         — per-clause (negotiable only)  (KarrarAyushgirizoho)
+  3. Counter Proposals Agent         — per-clause (negotiable only)  (KarrarAyushgirizoho)
   4. Global Explanation Agent    — full-contract summary         (KarrarGiriayushzoho)
   5. Regulatory Compliance Agent — full-contract legal check     (KarrarAvi)
 """
@@ -52,7 +52,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # One dedicated key per agent for better rate-limit distribution
 API_KEY_RISK       = os.getenv("OPENROUTER_API_KEY_RISK", "")        # Agent 1 — Risk Assessment
 API_KEY_EXPLAIN    = os.getenv("OPENROUTER_API_KEY_EXPLAIN", "")     # Agent 2 — Explanation
-API_KEY_COUNTER    = os.getenv("OPENROUTER_API_KEY_COUNTER", "")     # Agent 3 — Counter-Terms
+API_KEY_COUNTER    = os.getenv("OPENROUTER_API_KEY_COUNTER", "")     # Agent 3 — Counter Proposals
 API_KEY_GLOBAL     = os.getenv("OPENROUTER_API_KEY_GLOBAL", "")      # Agent 4 — Global Explanation
 API_KEY_COMPLIANCE = os.getenv("OPENROUTER_API_KEY_COMPLIANCE", "")  # Agent 5 — Regulatory Compliance
 
@@ -200,7 +200,7 @@ async def explain_clause(clause_text: str, clause_index: int) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Agent 3 — Counter-Terms  (per-clause, only if negotiable, Key 1)
+# Agent 3 — Counter Proposals  (per-clause, only if negotiable, Key 1)
 # ---------------------------------------------------------------------------
 
 async def generate_counter_term(
@@ -209,7 +209,7 @@ async def generate_counter_term(
     """Generate an alternative clause that protects the freelancer."""
     prompt = (
         "Contract negotiation expert for Indian freelancers. "
-        "Generate counter-term valid under Indian Contract Act 1872. "
+        "Generate counter proposal valid under Indian Contract Act 1872. "
         "Return ONLY JSON no markdown:\n"
         '{"counter":"<replacement clause>","negotiationTip":"<one sentence tip>"}\n'
         f"Clause:{clause_text}"
@@ -298,7 +298,7 @@ async def run_analysis_pipeline(
     Execute the full 5-agent analysis pipeline.
 
     Parallel execution plan (mirrors the n8n workflow):
-      Stream 1: clause → Risk Assessment → (if negotiable) Counter-Terms
+      Stream 1: clause → Risk Assessment → (if negotiable) Counter Proposals
       Stream 2: clause → Explanation
       Stream 3: full_text → Global Explanation
       Stream 4: full_text → Regulatory Compliance
@@ -332,7 +332,7 @@ async def run_analysis_pipeline(
           f"{len(explanation_results)} explanations")
 
     # ------------------------------------------------------------------
-    # Phase 2: Counter-Terms — only for negotiable clauses
+    # Phase 2: Counter Proposals — only for negotiable clauses
     # ------------------------------------------------------------------
     counter_tasks = []
     counter_indices = []
@@ -353,7 +353,7 @@ async def run_analysis_pipeline(
     for cr in counter_results_raw:
         counter_lookup[cr["clause_index"]] = cr
 
-    print(f"[PIPELINE] Phase 2 complete — {len(counter_results_raw)} counter-terms generated")
+    print(f"[PIPELINE] Phase 2 complete — {len(counter_results_raw)} counter proposals generated")
 
     # ------------------------------------------------------------------
     # Phase 3: Build final report  (mirrors n8n "Build Final Report" node)

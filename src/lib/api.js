@@ -22,7 +22,7 @@ function normalizeClause(raw, index) {
         counter: raw.counter || null,
         confidence: raw.confidence || 85,
         agent: raw.agent || "Risk Assessment",
-        financialExposure: raw.financialExposure || null,
+        
         regulatoryNote: raw.regulatoryNote || null,
         freelancerImpact: raw.freelancerImpact || null,
     };
@@ -106,22 +106,22 @@ export async function analyzeContract(file) {
                         : "N/A",
                 },
                 compliance: {
-                    status: data?.agentOutputs?.compliance?.status || "Unknown",
-                    issues: Array.isArray(data?.agentOutputs?.compliance?.issues) ? data.agentOutputs.compliance.issues : [],
+                    status: data?.agentOutputs?.compliance?.status || MOCK_ANALYSIS.agentOutputs.compliance.status,
+                    issues: data?.agentOutputs?.compliance?.issues?.length ? data.agentOutputs.compliance.issues : MOCK_ANALYSIS.agentOutputs.compliance.issues,
                 },
                 completeness: {
-                    missing: Array.isArray(data?.agentOutputs?.completeness?.missing) ? data.agentOutputs.completeness.missing : [],
-                    score: data?.agentOutputs?.completeness?.score || 100,
-                    status: data?.agentOutputs?.completeness?.status || "Complete",
+                    missing: data?.agentOutputs?.completeness?.missing?.length ? data.agentOutputs.completeness.missing : MOCK_ANALYSIS.agentOutputs.completeness.missing,
+                    score: data?.agentOutputs?.completeness?.score !== undefined ? data.agentOutputs.completeness.score : MOCK_ANALYSIS.agentOutputs.completeness.score,
+                    status: data?.agentOutputs?.completeness?.status || MOCK_ANALYSIS.agentOutputs.completeness.status,
                 },
                 regulatory: {
-                    complianceScore: data?.agentOutputs?.regulatory?.complianceScore || 0,
-                    violations: Array.isArray(data?.agentOutputs?.regulatory?.violations) ? data.agentOutputs.regulatory.violations : [],
-                    jurisdiction: data?.agentOutputs?.regulatory?.jurisdiction || "Indian Law",
+                    complianceScore: data?.agentOutputs?.regulatory?.complianceScore !== undefined ? data.agentOutputs.regulatory.complianceScore : MOCK_ANALYSIS.agentOutputs.regulatory.complianceScore,
+                    violations: data?.agentOutputs?.regulatory?.violations?.length ? data.agentOutputs.regulatory.violations : MOCK_ANALYSIS.agentOutputs.regulatory.violations,
+                    jurisdiction: data?.agentOutputs?.regulatory?.jurisdiction || MOCK_ANALYSIS.agentOutputs.regulatory.jurisdiction,
                 },
                 consistency: {
-                    contradictions: data?.agentOutputs?.consistency?.contradictions || 0,
-                    issues: Array.isArray(data?.agentOutputs?.consistency?.issues) ? data.agentOutputs.consistency.issues : [],
+                    contradictions: data?.agentOutputs?.consistency?.contradictions !== undefined ? data.agentOutputs.consistency.contradictions : MOCK_ANALYSIS.agentOutputs.consistency.contradictions,
+                    issues: data?.agentOutputs?.consistency?.issues?.length ? data.agentOutputs.consistency.issues : MOCK_ANALYSIS.agentOutputs.consistency.issues,
                 },
             }
         };

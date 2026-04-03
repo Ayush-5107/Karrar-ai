@@ -12,7 +12,7 @@ import { useScrollProgress } from "../hooks/useScrollProgress";
 const LANDING_AGENTS = [
     { name: "Completeness Agent", role: "Finds missing annexures & schedules", color: "#3b82f6", num: "01", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10" cy="10" r="6" /><line x1="14.5" y1="14.5" x2="20" y2="20" /><polyline points="8,10 10,12 13,8" /></svg>, detail: "Scans your entire contract to identify missing schedules, annexures, appendices, and referenced documents. If a clause mentions 'Schedule A' or 'Annexure 3' but it's not attached, this agent flags it — ensuring you never sign an incomplete agreement." },
     { name: "Risk & Red Flag Agent", role: "Scores every clause 0–100", color: "#ef4444", num: "02", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6L12 2z" /><line x1="12" y1="8" x2="12" y2="13" /><circle cx="12" cy="16" r="0.8" fill="currentColor" /></svg>, detail: "Analyzes every clause for potential risks — one-sided termination, unlimited liability, broad indemnity, non-compete overreach, and more. Each clause gets a risk score from 0 (safe) to 100 (dangerous), with financial exposure estimates in ₹ where applicable." },
-    { name: "Negotiation Agent", role: "Generates copy-paste counter-terms", color: "#C49E6C", num: "03", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M7 16H3v-4" /><path d="M3 12c0-4.4 3.6-8 8-8s8 3.6 8 8" /><path d="M17 8h4v4" /><path d="M21 12c0 4.4-3.6 8-8 8s-8-3.6-8-8" /></svg>, detail: "For every high-risk clause identified, this agent generates a professional, legally-sound counter-term you can copy-paste directly into your response email. It balances protecting your interests while maintaining a fair negotiation tone." },
+    { name: "Deal Optimization Agent", role: "Generates copy-paste counter proposals", color: "#C49E6C", num: "03", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M7 16H3v-4" /><path d="M3 12c0-4.4 3.6-8 8-8s8 3.6 8 8" /><path d="M17 8h4v4" /><path d="M21 12c0 4.4-3.6 8-8 8s-8-3.6-8-8" /></svg>, detail: "For every high-risk clause identified, this agent generates a professional, legally-sound counter proposal you can copy-paste directly into your response email. It balances protecting your interests while maintaining a fair negotiation tone." },
     { name: "Draft Consistency Agent", role: "Catches internal contradictions", color: "#8b5cf6", num: "04", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="5" width="11" height="14" rx="1.5" /><rect x="10" y="3" width="11" height="14" rx="1.5" fill="#030303" /><line x1="13" y1="8" x2="18" y2="8" /><line x1="13" y1="11" x2="17" y2="11" /></svg>, detail: "Cross-references all clauses against each other to catch contradictions — like one clause saying '30-day notice' while another says 'immediate termination.' These drafting errors are common and can void entire agreements under Indian law." },
     { name: "Regulatory Agent", role: "Cross-checks Indian Contract Act", color: "#22c55e", num: "05", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><line x1="3" y1="12" x2="21" y2="12" /><path d="M12 3a14 14 0 0 1 3 9 14 14 0 0 1-3 9 14 14 0 0 1-3-9 14 14 0 0 1 3-9z" /></svg>, detail: "Validates every clause against Indian Contract Act 1872, IT Act 2000, DPDP Act 2023, and other applicable regulations. Flags clauses that may be void, voidable, or unenforceable under Indian jurisdiction, citing the specific section of law." },
     { name: "Explanation Agent", role: "Translates legalese to plain English", color: "#f59e0b", num: "06", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><line x1="8" y1="10" x2="10" y2="10" /><line x1="13" y1="10" x2="16" y2="10" /><line x1="9" y1="13" x2="15" y2="13" /></svg>, detail: "Translates dense legal jargon into simple, plain English (and Hindi) that anyone can understand. No law degree needed — this agent tells you exactly what each clause means for you in everyday language, with a readability score." },
@@ -70,7 +70,7 @@ export function Landing({ onLogin }) {
 
     const triggerAnalysis = () => {
         setUploadState("analyzing");
-        const steps = [[10, "Parsing PDF…"], [30, "Completeness Agent…"], [50, "Risk Scoring Agent…"], [65, "Negotiation Agent…"], [80, "Consistency Agent…"], [92, "Regulatory Agent…"], [100, "Analysis complete."]];
+        const steps = [[10, "Parsing PDF…"], [30, "Completeness Agent…"], [50, "Risk Scoring Agent…"], [65, "Deal Optimization Agent…"], [80, "Consistency Agent…"], [92, "Regulatory Agent…"], [100, "Analysis complete."]];
         let i = 0;
         const next = () => {
             if (i < steps.length) { setProgress(steps[i][0]); setProgressLabel(steps[i][1]); i++; setTimeout(next, i === steps.length ? 400 : 600); }
@@ -106,7 +106,7 @@ export function Landing({ onLogin }) {
     const glowOpacity = dashProgress * 0.6;
 
     return (
-        <div style={{ fontFamily: "DM Sans, sans-serif", background: "#000000", color: "#FFFFFF", overflowX: "hidden", position: "relative" }}>
+        <div style={{ fontFamily: "Inter, sans-serif", background: "#000000", color: "#FFFFFF", overflowX: "hidden", position: "relative" }}>
             {/* ── CURSOR GLOW ── follows mouse, gold radial */}
             <motion.div style={{
                 position: "fixed", pointerEvents: "none", zIndex: 9999,
@@ -280,8 +280,8 @@ export function Landing({ onLogin }) {
                         {NAV.map(n => <span key={n} className={`nav-link${activeNav === n ? " active" : ""}`} onClick={() => scrollToSection(n)}>{n}</span>)}
                     </div>
                     <div className="nav-cta">
-                        <button className="btn-ghost" style={{ padding: "8px 20px", fontSize: 13 }} onClick={onLogin}>Login</button>
-                        <button className="btn-gold" style={{ padding: "9px 22px", fontSize: 13 }} onClick={onLogin}>Try Free →</button>
+                        <button className="btn-ghost" style={{ padding: "8px 20px", fontSize: 13 }} onClick={() => onLogin(false)}>Login</button>
+                        <button className="btn-gold" style={{ padding: "9px 22px", fontSize: 13 }} onClick={() => onLogin(true)}>Try Free →</button>
                     </div>
                     {/* Hamburger */}
                     <button className="hamburger" onClick={() => setMobileOpen(!mobileOpen)} style={{ marginLeft: "auto" }}>
@@ -298,8 +298,8 @@ export function Landing({ onLogin }) {
                 <div className="mobile-drawer">
                     {NAV.map(n => <span key={n} className={`nav-link${activeNav === n ? " active" : ""}`} onClick={() => { scrollToSection(n); setMobileOpen(false); }}>{n}</span>)}
                     <div className="mobile-cta">
-                        <button className="btn-ghost" style={{ padding: "12px 20px", fontSize: 15, width: "100%" }} onClick={() => { onLogin(); setMobileOpen(false); }}>Login</button>
-                        <button className="btn-gold" style={{ padding: "13px 22px", fontSize: 15, width: "100%" }} onClick={() => { onLogin(); setMobileOpen(false); }}>Try Free →</button>
+                        <button className="btn-ghost" style={{ padding: "12px 20px", fontSize: 15, width: "100%" }} onClick={() => { onLogin(false); setMobileOpen(false); }}>Login</button>
+                        <button className="btn-gold" style={{ padding: "13px 22px", fontSize: 15, width: "100%" }} onClick={() => { onLogin(true); setMobileOpen(false); }}>Try Free →</button>
                     </div>
                 </div>
             )}
@@ -378,7 +378,7 @@ export function Landing({ onLogin }) {
                         transition={{ duration: 0.7, delay: 0.85, ease: "easeOut" }}
                         style={{ fontSize: "clamp(15px, 1.8vw, 19px)", color: "#666", lineHeight: 1.75, marginBottom: 44 }}
                     >
-                        Audit Contracts, Analyze Risks &amp; Draft Counter-Terms in Plain English,{" "}
+                        Audit Contracts, Analyze Risks &amp; Draft Counter Proposals in Plain English,{" "}
                         <span style={{ background: "linear-gradient(90deg,#C49E6C,#F5D08A)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 600 }}>Under Indian Law.</span>
                     </motion.p>
 
@@ -393,7 +393,7 @@ export function Landing({ onLogin }) {
                             whileHover={{ scale: 1.04, boxShadow: "0 8px 32px rgba(196,158,108,0.35)" }}
                             whileTap={{ scale: 0.97 }}
                             className="btn-gold" style={{ padding: "18px 40px", fontSize: 18, display: "flex", alignItems: "center", gap: 11 }}
-                            onClick={onLogin}
+                            onClick={() => onLogin(true)}
                         >
                             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 14V4" /><polyline points="8,8 12,4 16,8" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
                             Upload a Contract — It's Free
@@ -449,7 +449,7 @@ export function Landing({ onLogin }) {
                         Your Intelligent<br />
                         <span style={{ background: "linear-gradient(90deg,#C49E6C,#F5D08A)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontStyle: "italic" }}>Contract Command Centre</span>
                     </h2>
-                    <p style={{ color: "#555", fontSize: 16, marginTop: 16 }}>6 AI agents. Real-time risk scoring. Counter-terms in one click.</p>
+                    <p style={{ color: "#555", fontSize: 16, marginTop: 16 }}>6 AI agents. Real-time risk scoring. Counter proposals in one click.</p>
                 </FadeUp>
 
                 {/* Scroll-driven dashboard reveal */}
@@ -480,7 +480,7 @@ export function Landing({ onLogin }) {
                     {[
                         { label: "Contracts Analyzed", value: 12400, suffix: "+" },
                         { label: "Risk Clauses Flagged", value: 84000, suffix: "+" },
-                        { label: "Counter-Terms Generated", value: 31000, suffix: "+" },
+                        { label: "Counter Proposals Generated", value: 31000, suffix: "+" },
                         { label: "Compliance Rate", value: 98, suffix: "%" },
                     ].map(s => (
                         <StaggerChild key={s.label} style={{ textAlign: "center" }}>
@@ -510,7 +510,7 @@ export function Landing({ onLogin }) {
                                 { num: "01", title: "Upload", desc: "Drag & drop your PDF contract. No account needed." },
                                 { num: "02", title: "Parallel Analysis", desc: "6 agents analyze simultaneously in under 90 seconds." },
                                 { num: "03", title: "Risk Report", desc: "Every clause scored 0–100 and ranked by severity." },
-                                { num: "04", title: "Counter-Terms", desc: "Copy-paste professional alternative clauses instantly." },
+                                { num: "04", title: "Counter Proposals", desc: "Copy-paste professional alternative clauses instantly." },
                                 { num: "05", title: "Act", desc: "Sign with clarity, negotiate, or consult a lawyer." },
                             ].map((s, i) => (
                                 <StaggerChild key={i}>
@@ -597,7 +597,7 @@ export function Landing({ onLogin }) {
                                 The client can cancel <em>anytime, for any reason</em>, and owes you <strong style={{ color: "#fff" }}>₹0</strong> for completed work — even if you spent 3 weeks on it.
                             </p>
                             <div style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.18)", borderRadius: 10, padding: "12px 14px" }}>
-                                <div style={{ fontSize: 10, color: "#22c55e", fontFamily: "IBM Plex Mono, monospace", marginBottom: 6 }}>✦ COUNTER-TERM GENERATED:</div>
+                                <div style={{ fontSize: 10, color: "#22c55e", fontFamily: "IBM Plex Mono, monospace", marginBottom: 6 }}>✦ COUNTER PROPOSAL GENERATED:</div>
                                 <p style={{ fontSize: 13, color: "#888", fontFamily: "Georgia, serif", fontStyle: "italic", lineHeight: 1.65 }}>
                                     "Either party may terminate with 30 days written notice. Upon termination, Client shall pay for all work completed pro-rata at agreed rate."
                                 </p>
@@ -647,7 +647,7 @@ export function Landing({ onLogin }) {
                             <div style={{ fontFamily: "Playfair Display, serif", fontSize: 22, fontWeight: 700, color: "#FFFFFF", marginBottom: 8 }}>Analysis Complete!</div>
                             <div style={{ color: "#555", fontSize: 14, marginBottom: 28 }}>Your contract has been analyzed by all 6 agents.</div>
                             <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 28, flexWrap: "wrap" }}>
-                                {[{ val: "8.4", label: "OVERALL RISK", c: "#ef4444" }, { val: "7", label: "FLAGGED CLAUSES", c: "#f59e0b" }, { val: "4", label: "COUNTER-TERMS", c: "#22c55e" }].map((s, i) => (
+                                {[{ val: "8.4", label: "OVERALL RISK", c: "#ef4444" }, { val: "7", label: "FLAGGED CLAUSES", c: "#f59e0b" }, { val: "4", label: "COUNTER PROPOSALS", c: "#22c55e" }].map((s, i) => (
                                     <div key={i} style={{ background: s.c + "0A", border: `1px solid ${s.c}25`, borderRadius: 12, padding: "12px 18px", textAlign: "center" }}>
                                         <div style={{ fontFamily: "Playfair Display, serif", fontSize: 30, fontWeight: 800, color: s.c }}>{s.val}</div>
                                         <div style={{ fontSize: 10, color: "#444", fontFamily: "IBM Plex Mono, monospace" }}>{s.label}</div>
@@ -673,34 +673,39 @@ export function Landing({ onLogin }) {
                     </FadeUp>
                     <StaggerContainer stagger={0.15} delay={0.15} className="grid-pricing">
                         {[
-                            { name: "Free", price: "₹0", period: "forever", features: ["3 contracts/month", "Basic risk scoring", "Plain language summary", "Email support"], cta: "Get Started Free", featured: false },
-                            { name: "Pro", price: "₹999", period: "/month", features: ["Unlimited contracts", "All 6 AI agents", "Counter-term generation", "Contract history", "Priority support", "Indian law database"], cta: "Start Pro", featured: true },
-                            { name: "Enterprise", price: "Custom", period: "", features: ["Everything in Pro", "API access", "DigiLocker integration", "Custom agents", "Dedicated support", "SLA guarantee"], cta: "Contact Us", featured: false },
+                            { name: "Freemium", price: "Free", period: "", features: ["3 contract analyses/month", "Basic risk flagging", "Plain language summary"], cta: "Get Started Free", featured: false },
+                            { name: "Starter", price: "₹999", period: "/mo", features: ["25 contracts/month", "Full risk + negotiation intel", "Regulatory compliance check"], cta: "Start Pro", featured: true },
+                            { name: "Pro SME", price: "₹2,999", period: "/mo", features: ["Unlimited contracts", "All 6 agents", "API access + priority support"], cta: "Contact Us", featured: false },
                         ].map((p, i) => (
-                            <StaggerChild key={i}>
-                                <MotionCard color={p.featured ? "#C49E6C" : "#444"} style={{ background: p.featured ? "#0F1115" : "#08090C", border: p.featured ? "1px solid rgba(196,158,108,0.45)" : "1px solid #1A1B1E", borderRadius: 22, padding: 32, position: "relative" }}>
+                            <StaggerChild key={i} style={{ height: "100%" }}>
+                                <MotionCard color={p.featured ? "#C49E6C" : "#444"} style={{ height: "100%", display: "flex", flexDirection: "column", background: p.featured ? "#0F1115" : "#08090C", border: p.featured ? "1px solid rgba(196,158,108,0.45)" : "1px solid #1A1B1E", borderRadius: 22, padding: 32, position: "relative" }}>
                                     {p.featured && <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: "linear-gradient(90deg,#C49E6C,#F5D08A)", color: "#000", fontSize: 10, fontFamily: "IBM Plex Mono, monospace", padding: "4px 14px", borderRadius: 20, letterSpacing: "0.06em", whiteSpace: "nowrap", fontWeight: 700 }}>MOST POPULAR</div>}
                                     <div style={{ fontFamily: "Playfair Display, serif", fontSize: 22, fontWeight: 700, color: "#FFFFFF", marginBottom: 8 }}>{p.name}</div>
                                     <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 24 }}>
                                         <span style={{ fontFamily: "Playfair Display, serif", fontSize: 42, fontWeight: 800, color: p.featured ? "#C49E6C" : "#444" }}>{p.price}</span>
                                         <span style={{ fontSize: 14, color: "#444" }}>{p.period}</span>
                                     </div>
-                                    {p.features.map((f, j) => (
-                                        <div key={j} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 11 }}>
-                                            <div style={{ width: 7, height: 7, background: "#C49E6C", borderRadius: 1, transform: "rotate(45deg)", flexShrink: 0 }} />
-                                            <span style={{ fontSize: 13, color: "#777" }}>{f}</span>
-                                        </div>
-                                    ))}
+                                    <div style={{ flex: 1 }}>
+                                        {p.features.map((f, j) => (
+                                            <div key={j} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 11 }}>
+                                                <div style={{ width: 7, height: 7, background: "#C49E6C", borderRadius: 1, transform: "rotate(45deg)", flexShrink: 0 }} />
+                                                <span style={{ fontSize: 13, color: "#777" }}>{f}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                     <motion.button
                                         whileHover={{ scale: 1.03 }}
                                         whileTap={{ scale: 0.97 }}
-                                        className={p.featured ? "btn-gold" : "btn-dark"} style={{ width: "100%", marginTop: 24, fontSize: 14, padding: "13px" }}
-                                        onClick={onLogin}
+                                        className={p.featured ? "btn-gold" : "btn-dark"} style={{ width: "100%", marginTop: "auto", paddingTop: 13, paddingBottom: 13, fontSize: 14 }}
+                                        onClick={() => onLogin(true)}
                                     >{p.cta}</motion.button>
                                 </MotionCard>
                             </StaggerChild>
                         ))}
                     </StaggerContainer>
+                    <div style={{ textAlign: "center", marginTop: 24, fontSize: 13, color: "#555", fontStyle: "italic" }}>
+                        Also: Enterprise licensing, API access for legal platforms &amp; marketplace integrations
+                    </div>
                 </div>
             </section>
 
@@ -718,8 +723,8 @@ export function Landing({ onLogin }) {
                         Join thousands of Indians who negotiate contracts like professionals — for free.
                     </p>
                     <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-                        <motion.button whileHover={{ scale: 1.04, boxShadow: "0 8px 32px rgba(196,158,108,0.35)" }} whileTap={{ scale: 0.97 }} className="btn-gold" style={{ fontSize: 17, padding: "17px 40px" }} onClick={onLogin}>Upload a Contract — It's Free</motion.button>
-                        <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} className="btn-ghost" style={{ fontSize: 17, padding: "17px 40px" }} onClick={onLogin}>View Pricing</motion.button>
+                        <motion.button whileHover={{ scale: 1.04, boxShadow: "0 8px 32px rgba(196,158,108,0.35)" }} whileTap={{ scale: 0.97 }} className="btn-gold" style={{ fontSize: 17, padding: "17px 40px" }} onClick={() => onLogin(true)}>Upload a Contract — It's Free</motion.button>
+                        <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} className="btn-ghost" style={{ fontSize: 17, padding: "17px 40px" }} onClick={() => onLogin(false)}>View Pricing</motion.button>
                     </div>
                 </div>
             </section>

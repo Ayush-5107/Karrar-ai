@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 
 export function UpgradeModal({ onClose }) {
     const plans = [
-        { name: "Starter", price: "₹499", period: "/month", analyses: "3 analyses/month", features: ["Full risk report", "Counter-terms", "Plain language", "Email support"], color: "#3b82f6" },
+        { name: "Starter", price: "₹499", period: "/month", analyses: "3 analyses/month", features: ["Full risk report", "Counter proposals", "Plain language", "Email support"], color: "#3b82f6" },
         { name: "Professional", price: "₹1,499", period: "/month", analyses: "Unlimited analyses", features: ["Everything in Starter", "Contract history", "Priority processing", "Download reports", "Lawyer referral"], color: "#C49E6C", popular: true },
         { name: "Enterprise", price: "Custom", period: "", analyses: "Unlimited + API access", features: ["Everything in Pro", "API integration", "Team accounts", "Custom Indian law KB", "Dedicated support"], color: "#8b5cf6" },
     ];

@@ -124,7 +124,7 @@ export function DashboardPreview() {
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                     <RiskBadge score={r.score} />
                                     <div style={{ background: "rgba(196,158,108,0.08)", border: "1px solid rgba(196,158,108,0.2)", borderRadius: 6, padding: "4px 10px", fontSize: 11, color: "#C49E6C", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: "IBM Plex Mono, monospace" }}>
-                                        Suggest Counter-Terms
+                                        Suggest Counter Proposals
                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#C49E6C" strokeWidth="2.5" strokeLinecap="round"><polyline points="9,18 15,12 9,6" /></svg>
                                     </div>
                                 </div>
